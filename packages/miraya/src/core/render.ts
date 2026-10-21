@@ -12,6 +12,7 @@ const FREEZE_CSS = `*, *::before, *::after {
 }`
 const QUIET_MS = 500
 const MAX_RENDER_ATTEMPTS = 3
+const STABLE_MS = 300
 const NAVIGATION_ERROR =
   /Execution context was destroyed|Cannot find context with specified id|because of a navigation/
 
@@ -265,6 +266,16 @@ export async function renderRoute(
     page.on('framenavigated', (frame) => {
       if (frame === page.mainFrame()) navigations++
     })
+    // waitForLoadState can resolve against the old document if the new navigation hasn't
+    // started yet, so wait until the page has loaded and stopped navigating for a moment.
+    const waitForStableDocument = async () => {
+      for (let i = 0; i < 20; i++) {
+        const seen = navigations
+        await page.waitForLoadState('load').catch(() => {})
+        await page.waitForTimeout(STABLE_MS)
+        if (navigations === seen) return
+      }
+    }
     const notes: string[] = []
     const relDir = join('routes', routeSlug(route))
     const png = join(relDir, `${dir}.png`)
@@ -319,7 +330,7 @@ export async function renderRoute(
           )
         }
         notes.push(`${dir}: the page reloaded during the audit, so it was rendered again`)
-        await page.waitForLoadState('load')
+        await waitForStableDocument()
         finalUrl = page.url()
         checkRedirect(requested, finalUrl, config)
       }

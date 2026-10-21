@@ -33,6 +33,13 @@ jobs:
       - run: pnpm --filter miraya exec playwright install --with-deps chromium
       # The precision suite: every fixture page must produce exactly its labelled findings.
       - run: pnpm --filter miraya test:e2e
+        env:
+          MIRAYA_E2E_OUT: ${{ runner.temp }}/e2e-report
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: ${{ runner.temp }}/e2e-report/
       # The Playwright helper, run by Playwright's own test runner against the fixture site.
       - run: pnpm --filter @miraya/playwright test:e2e
 

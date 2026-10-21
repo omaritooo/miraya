@@ -47,6 +47,7 @@ beforeAll(async () => {
     routes: manifests.map((m) => m.route),
     browser,
     outDir: process.env.MIRAYA_E2E_OUT ?? mkdtempSync(join(tmpdir(), 'miraya-e2e-')),
+    keepArtifacts: !!process.env.MIRAYA_E2E_OUT,
   })
   // Set MIRAYA_E2E_OUT to keep the report and screenshots for inspection.
   if (process.env.MIRAYA_E2E_OUT) writeReport(report, process.env.MIRAYA_E2E_OUT)
