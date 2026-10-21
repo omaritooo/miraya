@@ -15,7 +15,11 @@ const SCROLLS = new Set(['auto', 'scroll'])
 function clipsVertically(el: ElementSnap): 'ink' | 'lines' | undefined {
   if (!CLIPS.has(el.style.overflowY) || el.style.display === 'inline' || !el.text) return undefined
   const { sh, ch } = el.scroll
-  if (el.text.inkHeight !== undefined && el.text.inkHeight > ch + 1) return 'ink'
+  // measureText covers the whole string, so when the text overflows sideways (ellipsis,
+  // or hidden overflow) it includes glyphs nobody sees: skip the ink check then.
+  const overflowsSideways = el.scroll.sw > el.scroll.cw + 1
+  if (el.text.inkHeight !== undefined && !overflowsSideways && el.text.inkHeight > ch + 1)
+    return 'ink'
   if (sh > ch + 0.5 * (el.style.fontSize ?? 16)) return 'lines'
   return undefined
 }

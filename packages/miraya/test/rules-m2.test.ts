@@ -82,6 +82,17 @@ describe('clipped-text', () => {
     })
   })
 
+  it('skips the ink check on truncated text, whose measurement includes hidden glyphs', () => {
+    // Measured on Linux CI: 26px of ink in a 24px ellipsis box, nothing visibly clipped.
+    const truncated = el({
+      box,
+      style: { ...clipped, textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      scroll: { sw: 509, cw: 240, sh: 24, ch: 24 },
+      text: arabic(10, { inkHeight: 26 }),
+    })
+    expect(run('clipped-text', rtlPair([truncated]))).toEqual([])
+  })
+
   it('ignores content-area overflow that cuts no ink', () => {
     const fits = el({
       box,
