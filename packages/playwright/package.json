@@ -1,8 +1,30 @@
 {
   "name": "@miraya/playwright",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Playwright helpers for Miraya: assert that a page has no right-to-left bugs.",
   "license": "MIT",
+  "author": "omaritooo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omaritooo/miraya.git",
+    "directory": "packages/playwright"
+  },
+  "homepage": "https://github.com/omaritooo/miraya/tree/main/packages/playwright#readme",
+  "bugs": {
+    "url": "https://github.com/omaritooo/miraya/issues"
+  },
+  "keywords": [
+    "rtl",
+    "right-to-left",
+    "arabic",
+    "i18n",
+    "l10n",
+    "bidi",
+    "accessibility",
+    "playwright",
+    "testing",
+    "css"
+  ],
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -41,5 +63,8 @@
   },
   "dependencies": {
     "miraya": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

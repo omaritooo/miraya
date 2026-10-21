@@ -55,7 +55,7 @@ describe('rule engine', () => {
     expect(findings[0]).toMatchObject({
       severity: 'warn',
       message: 'n=3',
-      docsUrl: 'https://miraya.dev/rules/probe',
+      docsUrl: 'https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#probe',
     })
   })
 

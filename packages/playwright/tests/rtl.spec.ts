@@ -16,7 +16,9 @@ test('a page that does not mirror fails, naming the rule, element and docs', asy
   const message = (error as Error).message
   expect(message).toContain('Miraya found 3 new RTL problems on /not-mirrored/bad')
   expect(message).toContain('not-mirrored (error) [data-testid="sidebar"]')
-  expect(message).toContain('https://miraya.dev/rules/not-mirrored')
+  expect(message).toContain(
+    'https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#not-mirrored',
+  )
 })
 
 test('failOn lowers the bar to warnings', async ({ page }) => {

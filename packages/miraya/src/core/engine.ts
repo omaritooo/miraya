@@ -14,7 +14,9 @@ import type {
   SnapshotPair,
 } from '../types'
 
-export const DOCS_BASE_URL = 'https://miraya.dev/rules/'
+// Each rule has a section in the package README whose anchor is the rule id.
+export const DOCS_BASE_URL =
+  'https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#'
 
 const SEVERITY_RANK: Record<Severity, number> = { info: 0, warn: 1, error: 2 }
 const MATCH_RANK: Record<MatchMethod, number> = { heuristic: 0, path: 1, testid: 2 }

@@ -70,7 +70,7 @@
             }
           },
           "message": "Stays on the right in RTL. Start gap 880px in LTR, end gap 40px in RTL (tolerance 25px).",
-          "docsUrl": "https://miraya.dev/rules/not-mirrored",
+          "docsUrl": "https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#not-mirrored",
           "evidence": {
             "check": "gap",
             "startL": 880,

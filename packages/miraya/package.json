@@ -1,8 +1,30 @@
 {
   "name": "miraya",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Finds the bugs that only exist in the right-to-left version of a web app.",
   "license": "MIT",
+  "author": "omaritooo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omaritooo/miraya.git",
+    "directory": "packages/miraya"
+  },
+  "homepage": "https://github.com/omaritooo/miraya/tree/main/packages/miraya#readme",
+  "bugs": {
+    "url": "https://github.com/omaritooo/miraya/issues"
+  },
+  "keywords": [
+    "rtl",
+    "right-to-left",
+    "arabic",
+    "i18n",
+    "l10n",
+    "bidi",
+    "accessibility",
+    "playwright",
+    "testing",
+    "css"
+  ],
   "type": "module",
   "engines": {
     "node": ">=20"

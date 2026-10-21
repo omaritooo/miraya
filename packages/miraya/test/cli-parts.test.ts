@@ -39,7 +39,7 @@ const finding = (partial: Partial<Finding>): Finding => ({
   selector: '#a',
   boxes: {},
   message: 'm',
-  docsUrl: 'https://miraya.dev/rules/not-mirrored',
+  docsUrl: 'https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#not-mirrored',
   evidence: {},
   status: 'new',
   ...partial,
@@ -110,7 +110,7 @@ describe('GitHub output', () => {
       report(Array.from({ length: 250 }, (_, i) => finding({ id: `f${i}`, message: 'a | b' }))),
     )
     expect(summary).toContain(
-      '| error | [not-mirrored](https://miraya.dev/rules/not-mirrored) | `#a` | a \\| b |',
+      '| error | [not-mirrored](https://github.com/omaritooo/miraya/blob/main/packages/miraya/README.md#not-mirrored) | `#a` | a \\| b |',
     )
     expect(summary.match(/^\| error/gm)).toHaveLength(200)
     expect(summary).toContain('Truncated after 200 rows')
