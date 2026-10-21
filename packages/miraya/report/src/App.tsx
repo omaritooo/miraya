@@ -88,7 +88,9 @@ function Report({
       }
       if (e.key !== 'j' && e.key !== 'k') return
       const index = selected ? visible.indexOf(selected) : -1
-      const next = visible.at(Math.min(visible.length - 1, Math.max(0, index + (e.key === 'j' ? 1 : -1))))
+      const next = visible.at(
+        Math.min(visible.length - 1, Math.max(0, index + (e.key === 'j' ? 1 : -1))),
+      )
       if (next) select(next.id, true)
     }
     window.addEventListener('keydown', onKey)
@@ -125,7 +127,9 @@ function Report({
                 key={sev}
                 className={`toggle sev-${sev}`}
                 aria-pressed={filters.severity.includes(sev)}
-                onClick={() => update({ severity: toggle(filters.severity, sev), finding: undefined })}
+                onClick={() =>
+                  update({ severity: toggle(filters.severity, sev), finding: undefined })
+                }
               >
                 <span className="dot" aria-hidden="true" />
                 {SEVERITY_WORDS[sev]}
@@ -139,7 +143,9 @@ function Report({
                 key={status}
                 className="toggle"
                 aria-pressed={filters.status.includes(status)}
-                onClick={() => update({ status: toggle(filters.status, status), finding: undefined })}
+                onClick={() =>
+                  update({ status: toggle(filters.status, status), finding: undefined })
+                }
               >
                 {status === 'new' ? 'New' : 'Known'}
               </button>
@@ -149,7 +155,9 @@ function Report({
             ref={kindSelect}
             aria-label="Kind of problem"
             value={filters.rule[0] ?? ''}
-            onChange={(e) => update({ rule: e.target.value ? [e.target.value] : [], finding: undefined })}
+            onChange={(e) =>
+              update({ rule: e.target.value ? [e.target.value] : [], finding: undefined })
+            }
           >
             <option value="">All kinds</option>
             {rules.map((rule) => (
@@ -177,7 +185,10 @@ function Report({
                       update({ route: r.route, finding: undefined })
                     }}
                   >
-                    <span className={`dot ${r.status === 'error' ? 'sev-error' : worst ? `sev-${worst}` : 'is-clean'}`} aria-hidden="true" />
+                    <span
+                      className={`dot ${r.status === 'error' ? 'sev-error' : worst ? `sev-${worst}` : 'is-clean'}`}
+                      aria-hidden="true"
+                    />
                     <span className="route-path">{r.route}</span>
                     <span className="route-count">
                       {r.status === 'error' ? 'failed' : open.length || ''}
@@ -192,12 +203,14 @@ function Report({
           </ul>
           {report.fixed.length > 0 ? (
             <p className="fixed">
-              {report.fixed.length} fixed since the baseline. Run <code>miraya baseline update</code> to prune them.
+              {report.fixed.length} fixed since the baseline. Run{' '}
+              <code>miraya baseline update</code> to prune them.
             </p>
           ) : null}
           <p className="meta">
-            {report.tool.name} {report.tool.version} · {new Date(report.startedAt).toLocaleString()} ·{' '}
-            {(report.durationMs / 1000).toFixed(1)}s · {report.config.viewport.w}×{report.config.viewport.h}
+            {report.tool.name} {report.tool.version} · {new Date(report.startedAt).toLocaleString()}{' '}
+            · {(report.durationMs / 1000).toFixed(1)}s · {report.config.viewport.w}×
+            {report.config.viewport.h}
             {report.config.mode === 'rtl-only' ? ' · Arabic only' : ''}
           </p>
         </nav>
@@ -237,7 +250,12 @@ function Report({
                 instant={byKeyboard}
               />
             </main>
-            <Inspector route={route} findings={visible} selected={selected} onSelect={(id) => select(id)} />
+            <Inspector
+              route={route}
+              findings={visible}
+              selected={selected}
+              onSelect={(id) => select(id)}
+            />
           </>
         ) : (
           <p className="empty">This report has no routes.</p>
