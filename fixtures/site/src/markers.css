@@ -1,0 +1,11 @@
+.stage {
+  position: relative;
+  min-height: 120px;
+}
+/* Pinned to a physical side on purpose; the marker is missing its reason. */
+.pinned {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+}

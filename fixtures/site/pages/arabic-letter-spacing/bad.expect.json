@@ -1,0 +1,13 @@
+{
+  "route": "/arabic-letter-spacing/bad",
+  "expect": [
+    {
+      "rule": "arabic-letter-spacing",
+      "selector": "[data-testid=\"hero\"]"
+    },
+    {
+      "rule": "arabic-letter-spacing",
+      "selector": "[data-testid=\"kicker\"]"
+    }
+  ]
+}

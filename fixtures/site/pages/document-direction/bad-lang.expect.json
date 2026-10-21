@@ -1,0 +1,9 @@
+{
+  "route": "/document-direction/bad-lang",
+  "expect": [
+    {
+      "rule": "document-direction",
+      "selector": "html"
+    }
+  ]
+}

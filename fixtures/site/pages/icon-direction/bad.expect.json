@@ -1,0 +1,13 @@
+{
+  "route": "/icon-direction/bad",
+  "expect": [
+    {
+      "rule": "icon-direction",
+      "selector": "[data-testid=\"back\"]"
+    },
+    {
+      "rule": "icon-direction",
+      "selector": "[data-testid=\"play\"]"
+    }
+  ]
+}

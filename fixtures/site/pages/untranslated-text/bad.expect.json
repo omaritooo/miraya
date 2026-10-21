@@ -1,0 +1,13 @@
+{
+  "route": "/untranslated-text/bad",
+  "expect": [
+    {
+      "rule": "untranslated-text",
+      "selector": "[data-testid=\"add-1\"]"
+    },
+    {
+      "rule": "untranslated-text",
+      "selector": "[data-testid=\"promo\"]"
+    }
+  ]
+}

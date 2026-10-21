@@ -1,0 +1,44 @@
+name: Demo RTL audit
+
+# Runs Miraya, built from this repo, on the demo app in examples/demo-app.
+# On a pull request that breaks the Arabic layout, the job fails with annotations
+# and a job summary, and the HTML report is uploaded as an artifact.
+on:
+  pull_request:
+    paths:
+      - examples/demo-app/**
+      - packages/miraya/**
+      - .github/workflows/demo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  miraya:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter miraya build
+      - run: pnpm --filter miraya exec playwright install --with-deps chromium
+      - name: Serve the demo app
+        run: |
+          nohup pnpm --filter @miraya/demo-app serve > /tmp/demo-app.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:4400/en/ > /dev/null && exit 0; sleep 1; done
+          cat /tmp/demo-app.log
+          exit 1
+      # Annotations and the job summary are added automatically on GitHub Actions.
+      - name: Audit with Miraya
+        working-directory: examples/demo-app
+        run: pnpm miraya
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: miraya-report
+          path: examples/demo-app/.miraya/

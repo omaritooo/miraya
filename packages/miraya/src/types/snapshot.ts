@@ -1,0 +1,128 @@
+import { z } from 'zod'
+
+export const DirSchema = z.enum(['ltr', 'rtl'])
+export type Dir = z.infer<typeof DirSchema>
+
+/** Document coordinates, CSS px. */
+export const BoxSchema = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
+export type Box = z.infer<typeof BoxSchema>
+
+/**
+ * Computed styles the rules read. Text-only properties are collected only for
+ * elements with direct text (DESIGN.md › The walk); the rest always are.
+ */
+export const ElementStyleSchema = z.object({
+  direction: DirSchema,
+  transform: z.string(),
+  letterSpacing: z.string(),
+  overflowX: z.string(),
+  overflowY: z.string(),
+  unicodeBidi: z.string(),
+  display: z.string(),
+  position: z.string(),
+  justifyContent: z.string(),
+  textAlign: z.string().optional(),
+  fontFamily: z.string().optional(),
+  fontSize: z.number().optional(),
+  lineHeight: z.string().optional(),
+  textOverflow: z.string().optional(),
+  whiteSpace: z.string().optional(),
+})
+
+export const ElementTextSchema = z.object({
+  /** Direct text, whitespace-collapsed, max 200 chars. Kept only when it has Latin letters or digits. */
+  value: z.string().max(200).optional(),
+  arabic: z.number().int().nonnegative(),
+  latin: z.number().int().nonnegative(),
+  digits: z.object({
+    arabicIndic: z.number().int().nonnegative(),
+    western: z.number().int().nonnegative(),
+  }),
+  /** Glyph ink height (canvas measureText). Arabic text in overflow-hidden boxes only. */
+  inkHeight: z.number().optional(),
+})
+
+export const ElementSnapSchema = z.object({
+  /** Walk index, e.g. "e412". Unique within one render, meaningless across renders. */
+  key: z.string(),
+  parentKey: z.string().optional(),
+  depth: z.number().int().nonnegative(),
+  testId: z.string().optional(),
+  /** tag:nth-of-type chain from the nearest stable id or test id anchor. */
+  path: z.string(),
+  /** Human-readable selector for messages. */
+  selector: z.string(),
+  tag: z.string(),
+  role: z.string().optional(),
+  /** Accessible name length; the name itself is not stored. */
+  nameLength: z.number().int().nonnegative().optional(),
+  box: BoxSchema,
+  /** Nearest ancestor wider than the element, or "viewport" for position: fixed. */
+  containerKey: z.string().optional(),
+  style: ElementStyleSchema,
+  scroll: z.object({ sw: z.number(), cw: z.number(), sh: z.number(), ch: z.number() }),
+  text: ElementTextSchema.optional(),
+  /** From CDP, sampled nodes only. */
+  usedFonts: z
+    .array(z.object({ family: z.string(), custom: z.boolean(), glyphs: z.number().int() }))
+    .optional(),
+  icon: z
+    .object({
+      name: z.string().optional(),
+      label: z.string().optional(),
+      directional: z.boolean().optional(),
+      neverFlip: z.boolean().optional(),
+    })
+    .optional(),
+  input: z
+    .object({
+      type: z.string(),
+      name: z.string().optional(),
+      autocomplete: z.string().optional(),
+      inputMode: z.string().optional(),
+    })
+    .optional(),
+  /** Rule id (or "*") to reason, inherited from ancestors. */
+  ignore: z.record(z.string(), z.string()).optional(),
+  /** Nearest ancestor-or-self dir attribute. */
+  explicitDir: DirSchema.optional(),
+  /** "src/components/Nav.vue:12:3" when a source attribute exists. */
+  sourceHint: z.string().optional(),
+})
+export type ElementSnap = z.infer<typeof ElementSnapSchema>
+
+export const SnapshotSchema = z.object({
+  url: z.string(),
+  finalUrl: z.string(),
+  dir: DirSchema,
+  lang: z.string(),
+  viewport: z.object({ w: z.number().int(), h: z.number().int() }),
+  docHeight: z.number(),
+  /** Document scrollWidth and clientWidth, for page-level horizontal overflow. */
+  docWidth: z.object({ scroll: z.number(), client: z.number() }),
+  elements: z.array(ElementSnapSchema),
+  /** File paths. */
+  screenshot: z.object({ png: z.string(), jpeg: z.string(), truncated: z.boolean() }),
+  stats: z.object({
+    visited: z.number().int(),
+    collected: z.number().int(),
+    skipped: z.number().int(),
+    capped: z.boolean(),
+    errors: z.number().int(),
+  }),
+  pageErrors: z.array(z.string()),
+})
+export type Snapshot = z.infer<typeof SnapshotSchema>
+
+export const MatchMethodSchema = z.enum(['testid', 'path', 'heuristic'])
+export type MatchMethod = z.infer<typeof MatchMethodSchema>
+
+export const SnapshotPairSchema = z.object({
+  route: z.string(),
+  /** Absent in --rtl-only mode. */
+  ltr: SnapshotSchema.optional(),
+  rtl: SnapshotSchema,
+  matches: z.array(z.object({ ltr: z.string(), rtl: z.string(), method: MatchMethodSchema })),
+  unmatched: z.object({ ltr: z.array(z.string()), rtl: z.array(z.string()) }),
+})
+export type SnapshotPair = z.infer<typeof SnapshotPairSchema>

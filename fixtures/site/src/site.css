@@ -1,0 +1,25 @@
+/* Fonts are self-hosted so renders are identical on every machine (NFR-2). */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/ibm-plex-sans-arabic/400.css';
+@import '@fontsource/ibm-plex-sans-arabic/600.css';
+
+:root {
+  font-family: Inter, 'IBM Plex Sans Arabic', sans-serif;
+  color: #1c1c1e;
+  background: #ffffff;
+}
+
+/* Form controls don't inherit the page font by default, so Arabic labels would fall back to a system font. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+body {
+  margin: 0;
+  padding-block: 32px;
+  padding-inline: 40px;
+}

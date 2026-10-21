@@ -1,0 +1,24 @@
+import { z } from 'zod'
+import { BoxSchema, MatchMethodSchema } from './snapshot'
+
+export const SeveritySchema = z.enum(['info', 'warn', 'error'])
+export type Severity = z.infer<typeof SeveritySchema>
+
+export const FindingSchema = z.object({
+  /** Fingerprint, also used by `explain`. */
+  id: z.string(),
+  rule: z.string(),
+  severity: SeveritySchema,
+  route: z.string(),
+  selector: z.string(),
+  boxes: z.object({ ltr: BoxSchema.optional(), rtl: BoxSchema.optional() }),
+  message: z.string(),
+  docsUrl: z.string(),
+  evidence: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
+  match: MatchMethodSchema.optional(),
+  sourceHint: z.string().optional(),
+  status: z.enum(['new', 'baselined']).optional(),
+  /** Fingerprint of a fixed baseline entry with the same rule and route: likely the same bug after a DOM change. */
+  possiblyMoved: z.string().optional(),
+})
+export type Finding = z.infer<typeof FindingSchema>

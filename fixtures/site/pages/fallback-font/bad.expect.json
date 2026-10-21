@@ -1,0 +1,9 @@
+{
+  "route": "/fallback-font/bad",
+  "expect": [
+    {
+      "rule": "fallback-font",
+      "selector": "[data-testid=\"title\"]"
+    }
+  ]
+}

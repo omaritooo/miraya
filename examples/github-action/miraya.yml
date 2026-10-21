@@ -1,0 +1,35 @@
+# Copy to .github/workflows/miraya.yml in your app's repository.
+# Builds the app, serves it, and fails the pull request on new RTL errors.
+# Findings appear as annotations and in the job summary; the HTML report is an artifact.
+name: RTL audit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  miraya:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The Playwright image pins system fonts, so baselines stay stable between runs.
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Serve the production build; dev servers inject overlays that aren't your app.
+      - run: npm run preview -- --port 3000 &
+      - run: npx wait-on http://localhost:3000
+      # Annotations and the job summary are added automatically on GitHub Actions.
+      - run: npx miraya audit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: miraya-report
+          path: .miraya/

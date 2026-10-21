@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>المشغل</title>
+    <link rel="stylesheet" href="/src/site.css" />
+    <link rel="stylesheet" href="/src/icons.css" />
+    <link rel="stylesheet" href="/src/clip.css" />
+  </head>
+  <body>
+    <div
+      class="peek"
+      data-testid="peek"
+      data-rtl-ignore="not-mirrored: decorative shape, positioned on purpose"
+    ></div>
+    <main class="toolbar" data-testid="toolbar">
+      <button data-testid="btn-1">
+        <svg
+          data-testid="back"
+          class="lucide lucide-chevron-left"
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m15 18-6-6 6-6" /></svg
+        ><span data-testid="label-1">رجوع</span></button
+      ><button data-testid="btn-2">
+        <svg
+          data-testid="play"
+          class="lucide lucide-play flip-rtl"
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polygon points="6 3 20 12 6 21 6 3" /></svg
+        ><span data-testid="label-2">تشغيل</span>
+      </button>
+    </main>
+  </body>
+</html>

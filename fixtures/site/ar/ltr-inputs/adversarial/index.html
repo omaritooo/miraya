@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>التسجيل</title>
+    <link rel="stylesheet" href="/src/site.css" />
+    <link rel="stylesheet" href="/src/form.css" />
+  </head>
+  <body>
+    <main data-testid="main">
+      <form class="form" data-testid="form">
+        <label data-testid="phone-label"
+          >الهاتف<input type="tel" data-testid="phone" class="force-ltr"
+        /></label>
+        <label data-testid="email-label"
+          >البريد الإلكتروني<input type="email" data-testid="email" dir="rtl"
+        /></label>
+        <label data-testid="name-label"
+          >الاسم الكامل<input type="text" name="fullname" data-testid="name"
+        /></label>
+        <label data-testid="otp-label"
+          >الرمز<input autocomplete="one-time-code" inputmode="numeric" data-testid="otp" dir="ltr"
+        /></label>
+      </form>
+    </main>
+  </body>
+</html>

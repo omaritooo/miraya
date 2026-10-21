@@ -1,0 +1,16 @@
+packages:
+  - packages/*
+  - fixtures/*
+  - examples/demo-app
+
+# Supply-chain guard: only install versions published at least 14 days ago.
+minimumReleaseAge: 20160
+
+# Install scripts allowed only for these native-binary packages.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+
+# Security fixes for transitive dev dependencies (pulled in by eslint-plugin-boundaries).
+overrides:
+  handlebars: '>=4.7.10'

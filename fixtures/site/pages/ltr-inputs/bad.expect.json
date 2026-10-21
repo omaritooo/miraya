@@ -1,0 +1,13 @@
+{
+  "route": "/ltr-inputs/bad",
+  "expect": [
+    {
+      "rule": "ltr-inputs",
+      "selector": "[data-testid=\"email\"]"
+    },
+    {
+      "rule": "ltr-inputs",
+      "selector": "[data-testid=\"otp\"]"
+    }
+  ]
+}

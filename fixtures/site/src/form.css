@@ -1,0 +1,12 @@
+.form {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+}
+.form label {
+  display: grid;
+  gap: 4px;
+}
+.force-ltr {
+  direction: ltr;
+}

@@ -1,0 +1,17 @@
+{
+  "route": "/not-mirrored/bad",
+  "expect": [
+    {
+      "rule": "not-mirrored",
+      "selector": "[data-testid=\"badge\"]"
+    },
+    {
+      "rule": "not-mirrored",
+      "selector": "[data-testid=\"sidebar\"]"
+    },
+    {
+      "rule": "not-mirrored",
+      "selector": "[data-testid=\"step-1\"]"
+    }
+  ]
+}

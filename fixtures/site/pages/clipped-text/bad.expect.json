@@ -1,0 +1,17 @@
+{
+  "route": "/clipped-text/bad",
+  "expect": [
+    {
+      "rule": "clipped-text",
+      "selector": "[data-testid=\"tight\"]"
+    },
+    {
+      "rule": "clipped-text",
+      "selector": "[data-testid=\"cta\"]"
+    },
+    {
+      "rule": "clipped-text",
+      "selector": "html"
+    }
+  ]
+}

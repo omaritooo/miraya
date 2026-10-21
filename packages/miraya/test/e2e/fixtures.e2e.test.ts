@@ -1,0 +1,193 @@
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import AxeBuilder from '@axe-core/playwright'
+import { chromium, type Browser } from '@playwright/test'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import {
+  audit,
+  exitCode,
+  parseConfig,
+  ReportSchema,
+  writeHtmlReport,
+  writeReport,
+  type Report,
+} from '../../src'
+import { crawl } from '../../src/core'
+import { FIXTURE_URL } from './fixture-server'
+
+// The precision test: every fixture page must produce exactly its labelled findings,
+// from every rule. Good pages expect none, so any finding there is a false positive.
+const pagesDir = fileURLToPath(new URL('../../../../fixtures/site/pages/', import.meta.url))
+const manifests = readdirSync(pagesDir, { recursive: true, encoding: 'utf8' })
+  .filter((f) => f.endsWith('.expect.json'))
+  .map(
+    (f) =>
+      JSON.parse(readFileSync(join(pagesDir, f), 'utf8')) as {
+        route: string
+        expect: { rule: string; selector: string }[]
+      },
+  )
+
+const config = parseConfig({
+  baseUrl: FIXTURE_URL,
+  locale: { strategy: 'path-prefix', ltr: '/en', rtl: '/ar' },
+  allow: { latinText: ['Miraya', 'Visa'] },
+})
+
+let browser: Browser
+let report: Report
+
+beforeAll(async () => {
+  browser = await chromium.launch()
+  report = await audit({
+    config,
+    routes: manifests.map((m) => m.route),
+    browser,
+    outDir: process.env.MIRAYA_E2E_OUT ?? mkdtempSync(join(tmpdir(), 'miraya-e2e-')),
+  })
+  // Set MIRAYA_E2E_OUT to keep the report and screenshots for inspection.
+  if (process.env.MIRAYA_E2E_OUT) writeReport(report, process.env.MIRAYA_E2E_OUT)
+})
+afterAll(() => browser?.close())
+
+describe('fixture site', () => {
+  it('produces a report that matches the published schema', () => {
+    expect(ReportSchema.safeParse(report).success).toBe(true)
+  })
+
+  for (const manifest of manifests) {
+    it(`${manifest.route} has exactly its labelled findings`, () => {
+      const route = report.routes.find((r) => r.route === manifest.route)
+      expect(route?.errors).toEqual([])
+      const actual = (route?.findings ?? []).map((f) => `${f.rule} ${f.selector}`).sort()
+      const expected = manifest.expect.map((e) => `${e.rule} ${e.selector}`).sort()
+      expect(
+        actual,
+        JSON.stringify(
+          route?.findings.map((f) => f.message),
+          null,
+          2,
+        ),
+      ).toEqual(expected)
+    })
+  }
+
+  it('exits 1 because bad pages have new errors', () => {
+    expect(exitCode(report)).toBe(1)
+  })
+})
+
+describe('failures and other switchers', () => {
+  it('marks a missing route as failed and exits 2', async () => {
+    const result = await audit({
+      config,
+      routes: ['/does-not-exist'],
+      browser,
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-e2e-')),
+    })
+    expect(result.routes[0]?.errors).toMatchObject([
+      { kind: 'failed', message: expect.stringContaining('HTTP 404') },
+    ])
+    expect(exitCode(result)).toBe(2)
+    expect(exitCode(result, { allowErrors: true })).toBe(0)
+  })
+
+  it('audits with the attribute strategy when the app has no locale switch', async () => {
+    const result = await audit({
+      config: parseConfig({ baseUrl: FIXTURE_URL, locale: { strategy: 'attribute' } }),
+      routes: ['/en/not-mirrored/bad/'],
+      browser,
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-e2e-')),
+    })
+    const route = result.routes[0]
+    expect(route?.errors).toEqual([])
+    // The physical CSS is caught, and the forced dir and lang satisfy document-direction.
+    const rules = route?.findings.map((f) => f.rule) ?? []
+    expect(rules).toContain('not-mirrored')
+    expect(rules).not.toContain('document-direction')
+  })
+})
+
+describe('ignore markers', () => {
+  it('honours a marker without a reason, and warns about it and about unknown rule ids', () => {
+    const route = report.routes.find((r) => r.route === '/ignore-markers')
+    expect(route?.findings).toEqual([])
+    expect(route?.notes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('ignores "not-mirrored" without a reason'),
+        expect.stringContaining('unknown rule "not-mirored"'),
+      ]),
+    )
+  })
+})
+
+describe('HTML report', () => {
+  it('opens from disk, draws numbered outlines, shows details, and passes axe', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'miraya-html-'))
+    const result = await audit({
+      config,
+      routes: ['/not-mirrored/bad', '/not-mirrored/good'],
+      browser,
+      outDir,
+    })
+    const { file, inlined } = writeHtmlReport(result, outDir)
+    expect(inlined).toBe(true)
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    const page = await context.newPage()
+    try {
+      await page.goto(pathToFileURL(file).href)
+      await expect.poll(() => page.locator('.callout').count()).toBe(6) // 3 findings × 2 panes
+      await page
+        .getByRole('button', { name: /not-mirrored.*sidebar/ })
+        .first()
+        .click()
+      await expect.poll(() => page.locator('.evidence').textContent()).toContain('check')
+      expect(new URL(page.url()).hash).toContain('finding=')
+      // A filtered view survives a reload, because the filters live in the hash.
+      await page.getByRole('link', { name: /not-mirrored\/good/ }).click()
+      await page.reload()
+      await expect.poll(() => page.getByText('No RTL problems on this route.').count()).toBe(1)
+      const axe = await new AxeBuilder({ page }).analyze()
+      expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+    } finally {
+      await context.close()
+    }
+  })
+})
+
+describe('crawl and the CLI', () => {
+  it('crawls the fixture index, skipping excluded routes', async () => {
+    const routes = await crawl(
+      browser,
+      parseConfig({
+        ...config,
+        crawl: { start: '/', maxDepth: 1, exclude: ['/document-direction/**'] },
+      }),
+    )
+    expect(routes[0]).toBe('/')
+    expect(routes).toContain('/not-mirrored/bad')
+    expect(routes.some((r) => r.startsWith('/document-direction'))).toBe(false)
+    expect(routes.length).toBeGreaterThan(15)
+  })
+
+  it('runs `miraya audit` and exits 1 on new errors, writing both reports', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'miraya-cli-'))
+    writeFileSync(
+      join(dir, 'miraya.config.mjs'),
+      `export default ${JSON.stringify({ baseUrl: FIXTURE_URL, routes: ['/not-mirrored/bad'], locale: { strategy: 'path-prefix', ltr: '/en', rtl: '/ar' } })}\n`,
+    )
+    const cli = fileURLToPath(new URL('../../dist/cli.js', import.meta.url))
+    const run = spawnSync(process.execPath, [cli, 'audit'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_ACTIONS: '' },
+    })
+    expect(run.status, run.stderr).toBe(1)
+    expect(run.stdout).toContain('not-mirrored')
+    expect(existsSync(join(dir, '.miraya/report.json'))).toBe(true)
+    expect(existsSync(join(dir, '.miraya/report.html'))).toBe(true)
+  })
+})

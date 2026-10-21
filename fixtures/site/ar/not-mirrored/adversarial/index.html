@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>حالات خاصة</title>
+    <link rel="stylesheet" href="/src/site.css" />
+    <link rel="stylesheet" href="/src/not-mirrored.css" />
+  </head>
+  <body>
+    <main class="stage" data-testid="stage">
+      <div class="modal" data-testid="modal">
+        <h2 data-testid="modal-title">حذف الطلب؟</h2>
+        <p data-testid="modal-body">لا يمكن التراجع عن ذلك.</p>
+      </div>
+      <div class="spread" data-testid="spread">
+        <span data-testid="cell-1">المجموع الفرعي</span><span data-testid="cell-2">شحن مجاني</span
+        ><span data-testid="cell-3">الإجمالي</span>
+      </div>
+      <pre class="snippet" dir="ltr" data-testid="snippet">GET /api/orders</pre>
+    </main>
+    <button
+      class="chat"
+      data-testid="chat"
+      data-rtl-ignore="not-mirrored: brand rule, the chat launcher stays bottom-right"
+    >
+      محادثة
+    </button>
+  </body>
+</html>

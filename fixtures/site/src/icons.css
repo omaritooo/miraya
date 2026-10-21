@@ -1,0 +1,16 @@
+.toolbar {
+  display: flex;
+  gap: 24px;
+}
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font: inherit;
+}
+[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}

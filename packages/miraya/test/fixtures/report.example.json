@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "miraya",
+    "version": "0.3.0"
+  },
+  "startedAt": "2026-10-21T09:24:00.000Z",
+  "durationMs": 41230,
+  "config": {
+    "hash": "sha1:8d1e…",
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "mode": "pair"
+  },
+  "summary": {
+    "routes": 4,
+    "routeErrors": 0,
+    "findings": {
+      "error": 2,
+      "warn": 5,
+      "info": 1
+    },
+    "new": 3,
+    "baselined": 5,
+    "fixed": 1
+  },
+  "routes": [
+    {
+      "route": "/checkout",
+      "status": "ok",
+      "durationMs": 9120,
+      "pairing": {
+        "testid": 41,
+        "path": 210,
+        "heuristic": 6,
+        "unmatched": {
+          "ltr": 3,
+          "rtl": 5
+        }
+      },
+      "skippedRules": [],
+      "notes": ["settle cap hit after 5000ms"],
+      "screenshots": {
+        "ltr": "routes/checkout/ltr.jpg",
+        "rtl": "routes/checkout/rtl.jpg",
+        "truncated": false
+      },
+      "findings": [
+        {
+          "id": "3f2a9c…",
+          "rule": "not-mirrored",
+          "severity": "error",
+          "status": "new",
+          "route": "/checkout",
+          "selector": "[data-testid=\"order-summary\"]",
+          "boxes": {
+            "ltr": {
+              "x": 880,
+              "y": 140,
+              "w": 360,
+              "h": 420
+            },
+            "rtl": {
+              "x": 880,
+              "y": 140,
+              "w": 360,
+              "h": 420
+            }
+          },
+          "message": "Stays on the right in RTL. Start gap 880px in LTR, end gap 40px in RTL (tolerance 25px).",
+          "docsUrl": "https://miraya.dev/rules/not-mirrored",
+          "evidence": {
+            "check": "gap",
+            "startL": 880,
+            "endR": 40,
+            "endL": 40,
+            "startR": 880,
+            "delta": 840,
+            "tol": 25,
+            "containerSelector": "main"
+          },
+          "match": "testid"
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "fixed": [
+    {
+      "fingerprint": "77ab…",
+      "rule": "icon-direction",
+      "route": "/"
+    }
+  ]
+}

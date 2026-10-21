@@ -1,0 +1,9 @@
+{
+  "route": "/mixed-digits/bad",
+  "expect": [
+    {
+      "rule": "mixed-digits",
+      "selector": "html"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "name": "miraya",
+  "version": "0.0.0",
+  "description": "Finds the bugs that only exist in the right-to-left version of a web app.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./schema/*": "./schema/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "bundle:collector": "node scripts/bundle-collector.mjs",
+    "build": "pnpm bundle:collector && tsup && pnpm build:report",
+    "typecheck": "pnpm bundle:collector && tsc -p tsconfig.json && tsc -p report/tsconfig.json",
+    "test": "pnpm bundle:collector && vitest run",
+    "test:e2e": "pnpm build && vitest run --config vitest.e2e.config.ts",
+    "build:report": "vite build --config report/vite.config.ts"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "jiti": "^2.7.0",
+    "picomatch": "^4.0.7",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans-arabic": "5.3.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^20.19.43",
+    "@types/picomatch": "^4.0.3",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.2",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "esbuild": "^0.28.2",
+    "eslint": "10.12.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tsup": "^8.5.1",
+    "vite": "^8.3.3",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.11"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.50.0"
+  },
+  "bin": {
+    "miraya": "./dist/cli.js"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "route": "/icon-direction/overflow",
+  "expect": [
+    { "rule": "icon-direction", "selector": "[data-testid=\"back\"]" },
+    { "rule": "icon-direction", "selector": "[data-testid=\"play\"]" },
+    { "rule": "clipped-text", "selector": "html" }
+  ]
+}

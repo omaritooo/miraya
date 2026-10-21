@@ -1,0 +1,17 @@
+/* Inter has no Arabic glyphs: Arabic text in this stack falls back to a system font. */
+.latin-only {
+  font-family: Inter;
+}
+.tracked {
+  letter-spacing: 0.1em;
+}
+.kicker {
+  letter-spacing: 2px;
+}
+.caps {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.no-tracking {
+  letter-spacing: 0;
+}

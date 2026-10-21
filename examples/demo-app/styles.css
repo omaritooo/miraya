@@ -1,0 +1,43 @@
+@import '@fontsource/ibm-plex-sans-arabic/400.css';
+@import '@fontsource/ibm-plex-sans-arabic/600.css';
+
+:root {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  color: #1f1d1a;
+  background: #f7f5ef;
+}
+body {
+  margin: 0;
+}
+button {
+  font: inherit;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-block: 16px;
+  padding-inline: 32px;
+  background: #fff;
+  border-block-end: 1px solid #e3ded2;
+}
+.logo {
+  font-weight: 600;
+}
+.cart {
+  margin-inline-start: auto;
+}
+.card {
+  max-inline-size: 420px;
+  margin: 32px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e3ded2;
+}
+.card h1 {
+  margin-block: 0 8px;
+  font-size: 22px;
+}
+.card .price {
+  margin-block: 0 16px;
+}
