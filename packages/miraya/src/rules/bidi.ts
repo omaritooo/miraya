@@ -20,7 +20,8 @@ export function bidiClass(ch: string): BidiClass {
   if (HEBREW.test(ch)) return 'R'
   if (ch === '+' || ch === '-') return 'ES'
   if (ET.test(ch)) return 'ET'
-  if (ch === ',' || ch === '.' || ch === '/' || ch === ':' || ch === '\u00A0' || ch === '،') return 'CS'
+  if (ch === ',' || ch === '.' || ch === '/' || ch === ':' || ch === '\u00A0' || ch === '،')
+    return 'CS'
   if (/\s/u.test(ch)) return 'WS'
   if (/\p{L}/u.test(ch)) return 'L'
   return 'ON'
