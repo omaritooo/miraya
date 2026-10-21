@@ -162,6 +162,26 @@ describe('untranslated-text', () => {
     ])
   })
 
+  it('skips bare domains and short English terms inside Arabic sentences', () => {
+    const arabicParent = {
+      value: 'نص عربي',
+      arabic: 6,
+      latin: 0,
+      digits: { arabicIndic: 0, western: 0 },
+    }
+    const inline = { ...el({ box }).style, display: 'inline' }
+    const findings = audit(
+      rtlOnly([
+        el({ key: 'domain', text: text('javascript.info'), box }),
+        el({ key: 'p', text: arabicParent, box }),
+        el({ key: 'em', parentKey: 'p', style: inline, text: text('event handler'), box }),
+        el({ key: 'nav', selector: '#nav', text: text('Quick Start'), box }),
+      ]),
+      'untranslated-text',
+    )
+    expect(findings.map((f) => f.selector)).toEqual(['#nav'])
+  })
+
   it('skips brands, code, URLs, single words and LTR islands', () => {
     const findings = audit(
       rtlOnly([

@@ -13,7 +13,7 @@ const FAMILIES = {
   phone: /\+?\d[\d\s-]{6,}\d/gu,
   price: /(?:(?:EGP|SAR|AED|USD|US\$|\$|€|£)\s?\d[\d.,]*|\d[\d.,]*\s?(?:EGP|SAR|AED|USD|\$|€|£))/gu,
   email: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu,
-  url: /(?:https?:\/\/|www\.)\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|dev|io|eg|sa|ae)(?:\/\S*)?/gu,
+  url: /(?:https?:\/\/|www\.)\S+|\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}(?:\/\S*)?/gu,
   // Only inside Arabic text: an element that is all Latin is untranslated-text's case.
   'latin-phrase': /\p{Script=Latin}+(?:[\s'’-]+\p{Script=Latin}+)+/gu,
 } as const

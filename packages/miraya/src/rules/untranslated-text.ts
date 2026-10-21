@@ -5,8 +5,12 @@ import { ancestors, defineRule, isIgnored, shortHash } from './util'
 const ID = 'untranslated-text'
 const CODE_TAGS = new Set(['code', 'kbd', 'samp', 'pre', 'textarea', 'input'])
 const WORD = /\p{L}{2,}/gu
+// URLs, emails and bare domains (any dotted name ending in a TLD of 2+ letters: example.info).
 const URL_OR_EMAIL =
-  /^(https?:\/\/\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+|[\w-]+(\.[\w-]+)*\.(com|net|org|dev|io|eg|sa|ae)(\/\S*)?)$/i
+  /^(https?:\/\/\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+|[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/\S*)?)$/i
+// A short English term inside an Arabic sentence is a borrowed term, often a glossary
+// reference in <em>, not an interface string left untranslated.
+const TERM_MAX_WORDS = 4
 
 export default defineRule({
   meta: {
@@ -30,6 +34,13 @@ export default defineRule({
       const words = value.match(WORD) ?? []
       if (words.length < ctx.options.minWords) continue
       if (words.every((w) => allowed.has(w.toLowerCase()))) continue
+      const parent = el.parentKey ? ctx.el('rtl', el.parentKey) : undefined
+      if (
+        el.style.display.startsWith('inline') &&
+        (parent?.text?.arabic ?? 0) > 0 &&
+        words.length <= TERM_MAX_WORDS
+      )
+        continue
       if (CODE_TAGS.has(el.tag) || [...ancestors(el, 'rtl', ctx)].some((a) => CODE_TAGS.has(a.tag)))
         continue
       const normalised = value.toLowerCase()
