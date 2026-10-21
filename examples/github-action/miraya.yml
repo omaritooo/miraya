@@ -16,8 +16,8 @@ jobs:
     # The Playwright image pins system fonts, so baselines stay stable between runs.
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -28,8 +28,10 @@ jobs:
       - run: npx wait-on http://localhost:3000
       # Annotations and the job summary are added automatically on GitHub Actions.
       - run: npx miraya audit
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: miraya-report
           path: .miraya/
+          # .miraya/ starts with a dot; upload-artifact skips hidden files by default.
+          include-hidden-files: true

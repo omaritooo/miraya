@@ -15,11 +15,11 @@ jobs:
     # A hung browser test must fail the build, not run until the default 6-hour limit.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       # The development toolchain (pnpm 11) needs Node 22.13+. The published packages
       # still support Node 20, which the node20 job below checks.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -35,7 +35,7 @@ jobs:
       - run: pnpm --filter miraya test:e2e
         env:
           MIRAYA_E2E_OUT: ${{ runner.temp }}/e2e-report
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-report
@@ -48,9 +48,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -58,7 +58,7 @@ jobs:
       - run: pnpm --filter miraya build
       - run: pnpm --filter miraya exec playwright install --with-deps chromium
       # Everything from here runs on Node 20, as a user of the published package would.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - run: node --version
