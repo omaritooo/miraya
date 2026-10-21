@@ -34,7 +34,7 @@ jobs:
       # The precision suite: every fixture page must produce exactly its labelled findings.
       - run: pnpm --filter miraya test:e2e
       # The Playwright helper, run by Playwright's own test runner against the fixture site.
-      - run: pnpm --filter @miraya/playwright test
+      - run: pnpm --filter @miraya/playwright test:e2e
 
   node20:
     name: Built CLI runs on Node 20
