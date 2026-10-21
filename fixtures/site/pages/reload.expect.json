@@ -1,0 +1,4 @@
+{
+  "route": "/reload",
+  "expect": [{ "rule": "untranslated-text", "selector": "[data-testid=\"promo\"]" }]
+}

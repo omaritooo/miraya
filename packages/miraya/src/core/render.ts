@@ -11,6 +11,9 @@ const FREEZE_CSS = `*, *::before, *::after {
   scroll-behavior: auto !important;
 }`
 const QUIET_MS = 500
+const MAX_RENDER_ATTEMPTS = 3
+const NAVIGATION_ERROR =
+  /Execution context was destroyed|Cannot find context with specified id|because of a navigation/
 
 export class RedirectError extends Error {
   override name = 'RedirectError'
@@ -252,42 +255,76 @@ export async function renderRoute(
   page.on('pageerror', (error) => pageErrors.push(error.message))
   try {
     const requested = await open(page, route, dir, config)
-    const finalUrl = page.url()
+    let finalUrl = page.url()
     checkRedirect(requested, finalUrl, config)
 
-    const capped = await settle(page, config)
-    if (beforeCollect) {
-      await beforeCollect(page, dir)
-      await page.evaluate(
-        () =>
-          new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
-      )
-    }
-    const collected = await collectPage(page, {
-      testIdAttribute: config.pairing.testIdAttribute,
-      generatedIdPatterns: config.pairing.generatedIdPatterns ?? DEFAULT_GENERATED_ID_PATTERNS,
-      ...(config.source.attribute ? { sourceAttribute: config.source.attribute } : {}),
-      maxElements: 5000,
-      containerTolerancePx: 4,
+    // A page can reload under us: a dev server reacting to the files this audit writes,
+    // or a script redirecting after load. Count main-frame navigations, and redo the
+    // render if any happened between settling and the screenshots.
+    let navigations = 0
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) navigations++
     })
-
+    const notes: string[] = []
     const relDir = join('routes', routeSlug(route))
-    mkdirSync(join(outDir, relDir), { recursive: true })
-    const truncated = collected.docHeight > config.maxPageHeight
-    const shot = {
-      fullPage: true,
-      animations: 'disabled' as const,
-      caret: 'hide' as const,
-      ...(truncated
-        ? { clip: { x: 0, y: 0, width: collected.docWidth.scroll, height: config.maxPageHeight } }
-        : {}),
-    }
     const png = join(relDir, `${dir}.png`)
     const jpeg = join(relDir, `${dir}.jpg`)
-    await page.screenshot({ ...shot, type: 'png', path: join(outDir, png) })
-    await page.screenshot({ ...shot, type: 'jpeg', quality: 70, path: join(outDir, jpeg) })
+    mkdirSync(join(outDir, relDir), { recursive: true })
+    let collected: PageCollection | undefined
+    let capped = false
+    let truncated = false
+    for (let attempt = 1; !collected; attempt++) {
+      const before = navigations
+      try {
+        capped = await settle(page, config)
+        if (beforeCollect) {
+          await beforeCollect(page, dir)
+          await page.evaluate(
+            () =>
+              new Promise<void>((r) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => r())),
+              ),
+          )
+        }
+        const result = await collectPage(page, {
+          testIdAttribute: config.pairing.testIdAttribute,
+          generatedIdPatterns: config.pairing.generatedIdPatterns ?? DEFAULT_GENERATED_ID_PATTERNS,
+          ...(config.source.attribute ? { sourceAttribute: config.source.attribute } : {}),
+          maxElements: 5000,
+          containerTolerancePx: 4,
+        })
+        truncated = result.docHeight > config.maxPageHeight
+        const shot = {
+          fullPage: true,
+          animations: 'disabled' as const,
+          caret: 'hide' as const,
+          ...(truncated
+            ? { clip: { x: 0, y: 0, width: result.docWidth.scroll, height: config.maxPageHeight } }
+            : {}),
+        }
+        await page.screenshot({ ...shot, type: 'png', path: join(outDir, png) })
+        await page.screenshot({ ...shot, type: 'jpeg', quality: 70, path: join(outDir, jpeg) })
+        if (navigations === before) collected = result
+      } catch (error) {
+        // Only a navigation is worth retrying; anything else is a real failure. Playwright
+        // rejects the in-flight call before it emits framenavigated, so check the error too.
+        const navigated =
+          navigations !== before || (error instanceof Error && NAVIGATION_ERROR.test(error.message))
+        if (!navigated) throw error
+      }
+      if (!collected) {
+        if (attempt >= MAX_RENDER_ATTEMPTS) {
+          throw new Error(
+            `The page kept reloading during the audit (${attempt} attempts). If a dev server is serving it, stop it from watching the output folder.`,
+          )
+        }
+        notes.push(`${dir}: the page reloaded during the audit, so it was rendered again`)
+        await page.waitForLoadState('load')
+        finalUrl = page.url()
+        checkRedirect(requested, finalUrl, config)
+      }
+    }
 
-    const notes: string[] = []
     if (capped) notes.push(`${dir}: settle cap hit after ${config.timeouts.settleCapMs}ms`)
     if (collected.stats.capped)
       notes.push(`${dir}: element cap hit; elements after the first 5000 weren't checked`)

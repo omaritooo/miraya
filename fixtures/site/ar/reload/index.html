@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>تعيد التحميل مرة</title>
+    <link rel="stylesheet" href="/src/site.css" />
+    <script>
+      // Reload once, shortly after load, like a dev server reacting to a file change.
+      const key = `reloaded:${location.pathname}`
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1')
+        addEventListener('load', () => setTimeout(() => location.reload(), 300))
+      }
+    </script>
+  </head>
+  <body>
+    <main data-testid="main">
+      <h1 data-testid="heading">الحساب</h1>
+      <p data-testid="promo">Free shipping on all orders</p>
+    </main>
+  </body>
+</html>

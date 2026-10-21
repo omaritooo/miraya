@@ -191,3 +191,11 @@ describe('crawl and the CLI', () => {
     expect(existsSync(join(dir, '.miraya/report.html'))).toBe(true)
   })
 })
+
+describe('pages that reload during the audit', () => {
+  it('renders the page again and says so', () => {
+    const route = report.routes.find((r) => r.route === '/reload')
+    expect(route?.errors).toEqual([])
+    expect(route?.notes.some((n) => n.includes('reloaded during the audit'))).toBe(true)
+  })
+})
