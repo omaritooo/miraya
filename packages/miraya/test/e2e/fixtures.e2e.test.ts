@@ -154,7 +154,7 @@ describe('HTML report', () => {
       await page.reload()
       await expect
         .poll(() =>
-          page.getByText('Nothing to fix here. The Arabic page matches the English one.').count(),
+          page.getByText('Nothing to fix. The Arabic page matches the English one.').count(),
         )
         .toBe(1)
       const axe = await new AxeBuilder({ page }).analyze()

@@ -2,22 +2,23 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Finding, RouteResult } from './data'
 
 type Dir = 'ltr' | 'rtl'
+type Frame = { x: number; w: number }
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
-/** Fit shrinks the page to the pane; the others are fractions of the real page width. */
+/** Fit shrinks the page to the pane; the others are fractions of the real page width. Keys 1 to 4. */
 const ZOOMS = [
-  { value: 'fit', label: 'Fit' },
-  { value: '0.5', label: '50%' },
-  { value: '0.75', label: '75%' },
-  { value: '1', label: '100%' },
+  { value: 'fit', label: 'Fit', key: '1' },
+  { value: '0.5', label: '50%', key: '2' },
+  { value: '0.75', label: '75%', key: '3' },
+  { value: '1', label: '100%', key: '4' },
 ] as const
 type Zoom = (typeof ZOOMS)[number]['value']
 
-/**
- * The two renders side by side, divided by the mirror seam. Findings are numbered
- * outlines positioned in document coordinates, scaled to the displayed image width.
- */
+const typing = (target: EventTarget | null) =>
+  target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)
+
+/** The two renders side by side. Findings are numbered outlines in document coordinates, scaled to the image. */
 export function Stage({
   route,
   findings,
@@ -25,6 +26,7 @@ export function Stage({
   images,
   viewportWidth,
   onSelect,
+  instant,
 }: {
   route: RouteResult
   findings: Finding[]
@@ -32,9 +34,22 @@ export function Stage({
   images: Record<string, string>
   viewportWidth: number
   onSelect: (id: string) => void
+  /** Scroll without easing, as when moving by keyboard. */
+  instant: boolean
 }) {
   const sides: Dir[] = route.screenshots.ltr ? ['ltr', 'rtl'] : ['rtl']
   const [zoom, setZoom] = useState<Zoom>('0.5')
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return
+      const preset = ZOOMS.find((z) => z.key === e.key)
+      if (preset) setZoom(preset.value)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <section
       className="stage"
@@ -42,12 +57,9 @@ export function Stage({
       style={{ '--panes': sides.length } as CSSProperties}
     >
       <div className="stage-tools">
-        <span className="stage-tools-label" id="zoom-label">
-          Zoom
-        </span>
-        <div className="segmented" role="radiogroup" aria-labelledby="zoom-label">
+        <div className="segmented" role="radiogroup" aria-label="Zoom">
           {ZOOMS.map((z) => (
-            <label key={z.value}>
+            <label key={z.value} title={`Zoom ${z.label} (${z.key})`}>
               <input
                 type="radio"
                 name="zoom"
@@ -60,7 +72,7 @@ export function Stage({
           ))}
         </div>
       </div>
-      {sides.map((dir, i) => (
+      {sides.map((dir) => (
         <Pane
           key={`${route.route}-${dir}`}
           dir={dir}
@@ -69,13 +81,13 @@ export function Stage({
           findings={findings}
           selected={selected}
           onSelect={onSelect}
-          seam={i === 0 && sides.length === 2}
           zoom={zoom}
+          instant={instant}
         />
       ))}
       {route.screenshots.truncated ? (
         <p className="stage-note">
-          Screenshots are cut off at the maximum page height; findings below it aren't drawn.
+          Screenshots stop at the maximum page height; findings below it aren't drawn.
         </p>
       ) : null}
     </section>
@@ -85,29 +97,28 @@ export function Stage({
 function Pane({
   dir,
   src,
+  frame,
   findings,
   selected,
   onSelect,
-  seam,
   zoom,
-  frame,
+  instant,
 }: {
   dir: Dir
   src: string
-  frame: { x: number; w: number }
+  frame: Frame
   findings: Finding[]
   selected: Finding | undefined
   onSelect: (id: string) => void
-  seam: boolean
   zoom: Zoom
+  instant: boolean
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   // CSS px per screenshot px is unknown until the image loads; the outlines need the height.
   const [docHeight, setDocHeight] = useState<number>()
-
   const canvasWidth = zoom === 'fit' ? undefined : frame.w * Number(zoom)
 
-  // Selecting a finding scrolls both panes to it, across and down.
+  // Selecting a finding brings it into view in both panes.
   useEffect(() => {
     const box = selected?.boxes[dir]
     const el = scroller.current
@@ -116,15 +127,14 @@ function Pane({
     el.scrollTo({
       top: Math.max(0, box.y * scale - el.clientHeight / 3),
       left: Math.max(0, (box.x - frame.x + box.w / 2) * scale - el.clientWidth / 2),
-      behavior: reducedMotion() ? 'auto' : 'smooth',
+      behavior: instant || reducedMotion() ? 'auto' : 'smooth',
     })
-  }, [selected, dir, docHeight, frame.x, frame.w, canvasWidth])
+  }, [selected, dir, docHeight, frame.x, frame.w, canvasWidth, instant])
 
   return (
-    <figure className={`pane pane-${dir}${seam ? ' has-seam' : ''}`}>
+    <figure className={`pane pane-${dir}`}>
       <figcaption>
-        <span className="pane-dir">{dir.toUpperCase()}</span>
-        <span className="pane-label">{dir === 'ltr' ? 'Left to right' : 'Right to left'}</span>
+        {dir === 'ltr' ? 'English' : 'Arabic'} <span className="muted">{dir.toUpperCase()}</span>
       </figcaption>
       {/* Focusable so keyboard users can pan a zoomed screenshot with the arrow keys. */}
       <div
@@ -132,9 +142,9 @@ function Pane({
         ref={scroller}
         tabIndex={0}
         role="region"
-        aria-label={`${dir === 'ltr' ? 'Left-to-right' : 'Right-to-left'} screenshot`}
+        aria-label={`${dir === 'ltr' ? 'English' : 'Arabic'} screenshot`}
       >
-        {/* The canvas holds a physical screenshot, so it never mirrors with the report. */}
+        {/* A screenshot is a physical image, so its canvas never mirrors with the report. */}
         <div
           className={`canvas${selected ? ' has-selection' : ''}`}
           dir="ltr"
@@ -162,8 +172,6 @@ function Pane({
                     type="button"
                     key={f.id}
                     className={`callout sev-${f.severity}${isSelected ? ' is-selected' : ''}`}
-                    // Screenshots are physical images, so outlines use physical coordinates,
-                    // whatever the direction of the report itself.
                     style={{
                       left: `${((box.x - frame.x) / frame.w) * 100}%`,
                       top: `${(box.y / docHeight) * 100}%`,

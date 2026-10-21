@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { evidenceLabel, ruleFix, ruleTitle, SEVERITY_WORDS } from './copy'
 import type { Finding, RouteResult } from './data'
 
@@ -14,20 +14,34 @@ export function Inspector({
   onSelect: (id: string) => void
 }) {
   const hidden = route.findings.length - findings.length
+  const list = useRef<HTMLOListElement>(null)
+
+  // Keep the selected row in view as j / k move through a long list.
+  useEffect(() => {
+    list.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [selected])
+
   return (
     <section className="inspector" aria-labelledby="findings-title">
-      <h2 id="findings-title" tabIndex={-1}>
-        <span id="findings">Findings</span> <span className="muted">{findings.length}</span>
-        {hidden > 0 ? <span className="muted"> · {hidden} hidden by filters</span> : null}
-      </h2>
+      <header className="inspector-head">
+        <h2 id="findings-title" tabIndex={-1}>
+          <span id="findings">Findings</span> <span className="muted">{findings.length}</span>
+          {hidden > 0 ? <span className="muted"> · {hidden} filtered out</span> : null}
+        </h2>
+        {findings.length > 1 ? (
+          <p className="keys" aria-hidden="true">
+            <kbd>j</kbd> <kbd>k</kbd> to move
+          </p>
+        ) : null}
+      </header>
       {findings.length === 0 ? (
         <p className="all-clear">
           {route.findings.length === 0
-            ? 'Nothing to fix here. The Arabic page matches the English one.'
+            ? 'Nothing to fix. The Arabic page matches the English one.'
             : 'No findings match these filters.'}
         </p>
       ) : (
-        <ol className="finding-list">
+        <ol className="finding-list" ref={list}>
           {findings.map((f, n) => (
             <li key={f.id}>
               <button
@@ -36,16 +50,15 @@ export function Inspector({
                 aria-pressed={f === selected}
                 onClick={() => onSelect(f.id)}
               >
-                <span className="finding-number" aria-hidden="true">
-                  {n + 1}
-                </span>
+                <span className="finding-number">{n + 1}</span>
+                <span className="dot" aria-hidden="true" />
                 <span className="finding-body">
-                  <span className="finding-head">
-                    <span className="severity">{SEVERITY_WORDS[f.severity]}</span>
-                    {f.status === 'baselined' ? <span className="tag">Already known</span> : null}
-                    {f.possiblyMoved ? <span className="tag tag-moved">Possibly moved</span> : null}
+                  <span className="finding-title">
+                    {ruleTitle(f.rule)}
+                    <span className="visually-hidden">, {SEVERITY_WORDS[f.severity]}</span>
+                    {f.status === 'baselined' ? <span className="tag">known</span> : null}
+                    {f.possiblyMoved ? <span className="tag">moved?</span> : null}
                   </span>
-                  <span className="finding-title">{ruleTitle(f.rule)}</span>
                   <code className="finding-element" dir="ltr">
                     {f.selector}
                   </code>
@@ -55,7 +68,7 @@ export function Inspector({
           ))}
         </ol>
       )}
-      {selected ? <Detail key={selected.id} finding={selected} /> : null}
+      {selected ? <Detail finding={selected} /> : null}
     </section>
   )
 }
@@ -66,16 +79,17 @@ function Detail({ finding }: { finding: Finding }) {
   const fix = ruleFix(finding.rule)
   return (
     <article className="detail" aria-labelledby="detail-title">
-      <p className={`detail-kicker sev-${finding.severity}`}>
-        {SEVERITY_WORDS[finding.severity]} · <code>{finding.rule}</code>
+      <p className={`detail-severity sev-${finding.severity}`}>
+        <span className="dot" aria-hidden="true" /> {SEVERITY_WORDS[finding.severity]}
+        <code>{finding.rule}</code>
       </p>
       <h3 id="detail-title">{ruleTitle(finding.rule)}</h3>
       <p className="detail-message">{finding.message}</p>
       {fix ? (
-        <div className="fix">
-          <p className="fix-label">How to fix</p>
+        <section className="fix" aria-label="How to fix">
+          <h4>How to fix</h4>
           <p>{fix}</p>
-        </div>
+        </section>
       ) : null}
       <dl className="detail-facts">
         <div>
@@ -114,13 +128,13 @@ function Detail({ finding }: { finding: Finding }) {
       </details>
       <div className="detail-actions">
         <a href={finding.docsUrl} target="_blank" rel="noreferrer">
-          Read about this rule <span className="visually-hidden">(opens in a new tab)</span>
+          Rule docs <span className="visually-hidden">(opens in a new tab)</span>
         </a>
         <span className="explain">
           <code dir="ltr">{command}</code>
           <button
             type="button"
-            className="pressable"
+            className="button"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(command)
