@@ -25,7 +25,7 @@ button {
   font-weight: 600;
 }
 .cart {
-  margin-inline-start: auto;
+  margin-left: auto;
 }
 .card {
   max-inline-size: 420px;
@@ -37,6 +37,7 @@ button {
 .card h1 {
   margin-block: 0 8px;
   font-size: 22px;
+  letter-spacing: 0.08em;
 }
 .card .price {
   margin-block: 0 16px;
