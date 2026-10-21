@@ -144,7 +144,7 @@ importers:
 
   packages/playwright:
     dependencies:
-      miraya:
+      '@miraya/cli':
         specifier: workspace:*
         version: link:../miraya
     devDependencies:

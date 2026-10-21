@@ -25,8 +25,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter miraya build
-      - run: pnpm --filter miraya exec playwright install --with-deps chromium
+      - run: pnpm --filter @miraya/cli build
+      - run: pnpm --filter @miraya/cli exec playwright install --with-deps chromium
       - name: Serve the demo app
         run: |
           nohup pnpm --filter @miraya/demo-app serve > /tmp/demo-app.log 2>&1 &

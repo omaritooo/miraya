@@ -14,18 +14,18 @@ Miraya opens each page twice in a real browser, once in English (LTR) and once i
 ## Install
 
 ```sh
-npm install --save-dev miraya @playwright/test
+npm install --save-dev @miraya/cli @playwright/test
 npx playwright install chromium
 ```
 
-Node 20 or later. Miraya drives Chromium through Playwright, which you install alongside it.
+Node 20 or later. Miraya drives Chromium through Playwright, which you install alongside it. The package is `@miraya/cli`; the command it installs is `miraya`.
 
 ## Quick start
 
 Create `miraya.config.ts` in your project:
 
 ```ts
-import { defineConfig } from 'miraya'
+import { defineConfig } from '@miraya/cli'
 
 export default defineConfig({
   baseUrl: 'http://localhost:3000',
@@ -81,7 +81,7 @@ Everything except `baseUrl` is optional.
 | `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                            |
 | `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                        |
 
-The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gives you types and autocomplete. JSON Schemas for the report and the baseline ship in `miraya/schema/`.
+The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gives you types and autocomplete. JSON Schemas for the report and the baseline ship in `@miraya/cli/schema/`.
 
 ## Commands
 
@@ -231,7 +231,7 @@ A phone number, price, email, URL or English phrase inside Arabic text can be di
 
 ```ts
 import { chromium } from '@playwright/test'
-import { audit, parseConfig, writeHtmlReport } from 'miraya'
+import { audit, parseConfig, writeHtmlReport } from '@miraya/cli'
 
 const config = parseConfig({ baseUrl: 'http://localhost:3000', routes: ['/'] })
 const browser = await chromium.launch()

@@ -1,6 +1,6 @@
 # @miraya/playwright
 
-Check for right-to-left bugs inside your Playwright tests with [Miraya](https://www.npmjs.com/package/miraya).
+Check for right-to-left bugs inside your Playwright tests with [Miraya](https://www.npmjs.com/package/@miraya/cli).
 
 ```sh
 npm install --save-dev @miraya/playwright @playwright/test

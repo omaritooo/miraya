@@ -10,7 +10,7 @@ Miraya opens each page in English and in Arabic in a real browser, pairs up the 
 </picture>
 
 ```sh
-npm install --save-dev miraya @playwright/test
+npm install --save-dev @miraya/cli @playwright/test
 npx playwright install chromium
 npx miraya audit
 ```
@@ -19,7 +19,7 @@ npx miraya audit
 
 | Package                                     | What it is                                          |
 | ------------------------------------------- | --------------------------------------------------- |
-| [`miraya`](packages/miraya)                 | The CLI, the rules and the HTML report. Start here. |
+| [`@miraya/cli`](packages/miraya)            | The CLI, the rules and the HTML report. Start here. |
 | [`@miraya/playwright`](packages/playwright) | `rtl.expectClean(page, …)` for Playwright tests.    |
 
 ## Examples
@@ -36,7 +36,7 @@ pnpm install
 pnpm exec playwright install chromium
 pnpm build
 pnpm test                              # unit tests
-pnpm --filter miraya test:e2e          # renders the fixture site in Chromium
+pnpm --filter @miraya/cli test:e2e          # renders the fixture site in Chromium
 pnpm --filter @miraya/playwright test:e2e
 pnpm lint && pnpm typecheck
 ```

@@ -62,7 +62,7 @@
     "tsup": "8.5.1"
   },
   "dependencies": {
-    "miraya": "workspace:*"
+    "@miraya/cli": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

@@ -7,5 +7,5 @@ export default defineConfig({
   dts: { compilerOptions: { ignoreDeprecations: '6.0' } },
   clean: true,
   target: 'node20',
-  external: ['miraya', '@playwright/test'],
+  external: ['@miraya/cli', '@playwright/test'],
 })

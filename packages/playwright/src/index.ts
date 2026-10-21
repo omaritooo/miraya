@@ -13,7 +13,7 @@ import {
   type RuleSetting,
   type Severity,
   type SwitchTo,
-} from 'miraya'
+} from '@miraya/cli'
 
 export interface AuditOptions {
   /** The route, resolved against Playwright's baseURL. */
