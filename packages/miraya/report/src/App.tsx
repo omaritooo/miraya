@@ -9,6 +9,7 @@ import {
   type ReportData,
 } from './data'
 import { Inspector } from './Inspector'
+import { routeVerdict, ruleTitle, SEVERITY_WORDS } from './copy'
 import { Stage } from './Stage'
 
 function useHashFilters(): [Filters, (next: Partial<Filters>) => void] {
@@ -63,8 +64,16 @@ function Report({
     () => (route ? route.findings.filter((f) => matches(f, filters)) : []),
     [route, filters],
   )
-  const selected = visible.find((f) => f.id === filters.finding)
+  const selected = visible.find((f) => f.id === filters.finding) ?? visible[0]
   const s = report.summary
+  const all = report.routes.flatMap((r) => r.findings).filter((f) => f.status !== 'baselined')
+  const mustFix = all.filter((f) => f.severity === 'error').length
+  const shouldFix = all.filter((f) => f.severity === 'warn').length
+  const pages = `${s.routes} ${s.routes === 1 ? 'page' : 'pages'}`
+  const overall =
+    mustFix + shouldFix === 0
+      ? `No new right-to-left problems across ${pages}.`
+      : `${[mustFix ? `${mustFix} to fix` : '', shouldFix ? `${shouldFix} worth fixing` : ''].filter(Boolean).join(' and ')} across ${pages}.`
 
   return (
     <>
@@ -79,36 +88,15 @@ function Report({
           </span>
           <span className="visually-hidden"> report</span>
         </h1>
-        <dl className="summary">
-          <div>
-            <dt>Routes</dt>
-            <dd>{s.routes}</dd>
-          </div>
-          {SEVERITIES.map((sev) => (
-            <div key={sev} className={`sev-${sev}`}>
-              <dt>{sev === 'warn' ? 'Warnings' : sev === 'error' ? 'Errors' : 'Info'}</dt>
-              <dd>{s.findings[sev]}</dd>
-            </div>
-          ))}
-          <div>
-            <dt>New</dt>
-            <dd>{s.new}</dd>
-          </div>
-          <div>
-            <dt>Baselined</dt>
-            <dd>{s.baselined}</dd>
-          </div>
-          <div>
-            <dt>Fixed</dt>
-            <dd>{s.fixed}</dd>
-          </div>
-        </dl>
-        <p className="meta">
-          {report.tool.name} {report.tool.version} · {new Date(report.startedAt).toLocaleString()} ·{' '}
-          {(report.durationMs / 1000).toFixed(1)}s · {report.config.viewport.w}×
-          {report.config.viewport.h}
-          {report.config.mode === 'rtl-only' ? ' · RTL only' : ''}
-        </p>
+        <div className="verdict">
+          <p className="verdict-line">{overall}</p>
+          <p className="verdict-detail">
+            {s.routeErrors ? `${s.routeErrors} couldn't be checked · ` : ''}
+            {s.baselined ? `${s.baselined} already known · ` : ''}
+            {s.fixed ? `${s.fixed} fixed since the baseline · ` : ''}
+            {s.findings.info ? `${s.findings.info} notes` : ''}
+          </p>
+        </div>
       </header>
 
       <div className="layout">
@@ -129,7 +117,7 @@ function Report({
                   >
                     <span className="route-path">{r.route}</span>
                     {r.status === 'error' ? (
-                      <span className="tag tag-error">failed</span>
+                      <span className="tag tag-error">couldn't check</span>
                     ) : (
                       <span className="counts">
                         {SEVERITIES.map((sev) =>
@@ -140,7 +128,7 @@ function Report({
                           ) : null,
                         )}
                         {r.findings.length === 0 ? (
-                          <span className="count clean">clean</span>
+                          <span className="count clean">all clear</span>
                         ) : null}
                       </span>
                     )}
@@ -176,7 +164,7 @@ function Report({
                       update({ severity: toggle(filters.severity, sev), finding: undefined })
                     }
                   />
-                  {sev}
+                  {SEVERITY_WORDS[sev]}
                 </label>
               ))}
             </div>
@@ -190,22 +178,22 @@ function Report({
                       update({ status: toggle(filters.status, status), finding: undefined })
                     }
                   />
-                  {status}
+                  {status === 'new' ? 'New' : 'Already known'}
                 </label>
               ))}
             </div>
             <label className="rule-select">
-              <span>Rule</span>
+              <span>Show</span>
               <select
                 value={filters.rule[0] ?? ''}
                 onChange={(e) =>
                   update({ rule: e.target.value ? [e.target.value] : [], finding: undefined })
                 }
               >
-                <option value="">All rules</option>
+                <option value="">All kinds of problem</option>
                 {rules.map((rule) => (
                   <option key={rule} value={rule}>
-                    {rule}
+                    {ruleTitle(rule)}
                   </option>
                 ))}
               </select>
@@ -233,6 +221,10 @@ function Report({
                   ))}
                 </ul>
               ) : null}
+              <p className={`route-verdict${route.findings.length === 0 ? ' is-clean' : ''}`}>
+                <code dir="ltr">{route.route}</code>{' '}
+                {routeVerdict(route.findings, route.status === 'error')}
+              </p>
               <div className="split">
                 <Stage
                   route={route}
@@ -255,6 +247,12 @@ function Report({
           )}
         </main>
       </div>
+      <footer className="meta">
+        Checked by {report.tool.name} {report.tool.version} on{' '}
+        {new Date(report.startedAt).toLocaleString()} in {(report.durationMs / 1000).toFixed(1)}s,
+        at {report.config.viewport.w}×{report.config.viewport.h}
+        {report.config.mode === 'rtl-only' ? ', Arabic only' : ''}.
+      </footer>
     </>
   )
 }

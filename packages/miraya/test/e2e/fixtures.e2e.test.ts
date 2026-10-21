@@ -147,12 +147,16 @@ describe('HTML report', () => {
         .getByRole('button', { name: /not-mirrored.*sidebar/ })
         .first()
         .click()
-      await expect.poll(() => page.locator('.evidence').textContent()).toContain('check')
+      await expect.poll(() => page.locator('.evidence').textContent()).toContain('What failed')
       expect(new URL(page.url()).hash).toContain('finding=')
       // A filtered view survives a reload, because the filters live in the hash.
       await page.getByRole('link', { name: /not-mirrored\/good/ }).click()
       await page.reload()
-      await expect.poll(() => page.getByText('No RTL problems on this route.').count()).toBe(1)
+      await expect
+        .poll(() =>
+          page.getByText('Nothing to fix here. The Arabic page matches the English one.').count(),
+        )
+        .toBe(1)
       const axe = await new AxeBuilder({ page }).analyze()
       expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
     } finally {

@@ -136,7 +136,7 @@ function Pane({
       >
         {/* The canvas holds a physical screenshot, so it never mirrors with the report. */}
         <div
-          className="canvas"
+          className={`canvas${selected ? ' has-selection' : ''}`}
           dir="ltr"
           style={canvasWidth ? { inlineSize: `${canvasWidth}px` } : undefined}
         >
