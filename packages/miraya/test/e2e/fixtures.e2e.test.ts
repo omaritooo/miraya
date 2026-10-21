@@ -34,7 +34,9 @@ const manifests = readdirSync(pagesDir, { recursive: true, encoding: 'utf8' })
 const config = parseConfig({
   baseUrl: FIXTURE_URL,
   locale: { strategy: 'path-prefix', ltr: '/en', rtl: '/ar' },
-  allow: { latinText: ['Miraya', 'Visa'] },
+  allow: { latinText: ['Miraya', 'Visa', 'Apple', 'Watch'] },
+  // Experimental rules run on every page here, so a false positive anywhere fails the suite.
+  experimental: ['bidi-isolation'],
 })
 
 let browser: Browser

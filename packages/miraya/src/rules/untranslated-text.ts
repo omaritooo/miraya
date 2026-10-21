@@ -5,7 +5,8 @@ import { ancestors, defineRule, isIgnored, shortHash } from './util'
 const ID = 'untranslated-text'
 const CODE_TAGS = new Set(['code', 'kbd', 'samp', 'pre', 'textarea', 'input'])
 const WORD = /\p{L}{2,}/gu
-const URL_OR_EMAIL = /^(https?:\/\/\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+)$/i
+const URL_OR_EMAIL =
+  /^(https?:\/\/\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+|[\w-]+(\.[\w-]+)*\.(com|net|org|dev|io|eg|sa|ae)(\/\S*)?)$/i
 
 export default defineRule({
   meta: {

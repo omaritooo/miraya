@@ -1,0 +1,17 @@
+{
+  "route": "/bidi-isolation/bad",
+  "expect": [
+    {
+      "rule": "bidi-isolation",
+      "selector": "[data-testid=\"dashed\"]"
+    },
+    {
+      "rule": "bidi-isolation",
+      "selector": "[data-testid=\"phone\"]"
+    },
+    {
+      "rule": "bidi-isolation",
+      "selector": "[data-testid=\"site\"]"
+    }
+  ]
+}

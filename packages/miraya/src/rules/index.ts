@@ -1,5 +1,6 @@
 import type { Rule } from '../types'
 import arabicLetterSpacing from './arabic-letter-spacing'
+import bidiIsolation from './bidi-isolation'
 import clippedText from './clipped-text'
 import documentDirection from './document-direction'
 import fallbackFont from './fallback-font'
@@ -20,6 +21,7 @@ export const builtinRules = [
   arabicLetterSpacing,
   clippedText,
   untranslatedText,
+  bidiIsolation,
   ltrInputs,
   mixedDigits,
 ] as Rule<unknown>[]

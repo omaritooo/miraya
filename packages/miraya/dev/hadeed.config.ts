@@ -8,7 +8,7 @@ import { defineConfig } from '../src'
 export default defineConfig({
   baseUrl: process.env.HADEED_URL ?? 'http://localhost:3000',
   routes: process.env.HADEED_STORAGE_STATE
-    ? ['/', '/workouts', '/nutrition', '/stats', '/profile']
+    ? ['/', '/workouts', '/nutrition', '/stats', '/profile', '/builder']
     : ['/login'],
   locale: { strategy: 'cookie', name: 'i18n_locale', ltr: 'en', rtl: 'ar' },
   auth: {
@@ -16,4 +16,5 @@ export default defineConfig({
     loginUrlPattern: '/login',
   },
   allow: { latinText: ['Hadeed'] },
+  experimental: ['bidi-isolation'],
 })
