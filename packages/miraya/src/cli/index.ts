@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { pathToFileURL } from 'node:url'
-import type { Browser } from 'playwright'
+import type { Browser } from '@playwright/test'
 import { Command, Option } from 'commander'
 import pkg from '../../package.json'
 import {

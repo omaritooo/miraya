@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import { FindingSchema } from './finding'
 
 const FixedEntrySchema = z.object({ fingerprint: z.string(), rule: z.string(), route: z.string() })

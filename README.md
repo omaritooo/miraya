@@ -10,7 +10,7 @@ Miraya opens each page in English and in Arabic in a real browser, pairs up the 
 </picture>
 
 ```sh
-npm install --save-dev @miraya/cli
+npm install --save-dev @miraya/cli @playwright/test
 npx miraya
 ```
 

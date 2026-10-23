@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { z } from 'zod'
+import * as z from 'zod'
 import { rtlWrapper } from '../rules/util'
 import type { CropCache } from './crops'
 import type {

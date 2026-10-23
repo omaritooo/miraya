@@ -14,10 +14,10 @@ Miraya opens each page twice in a real browser, once in English (LTR) and once i
 ## Install
 
 ```sh
-npm install --save-dev @miraya/cli
+npm install --save-dev @miraya/cli @playwright/test
 ```
 
-Node 20 or later. The package is `@miraya/cli`; the command it installs is `miraya`. Miraya drives Chromium through Playwright, which comes with it; the first run downloads Chromium if it isn't there yet.
+Node 20 or later. The package is `@miraya/cli`; the command it installs is `miraya`. Miraya drives Chromium through your project's Playwright, any version from 1.50; the first run downloads Chromium if it isn't there yet.
 
 ## Quick start
 
@@ -284,7 +284,7 @@ A phone number, price, email, URL or English phrase inside Arabic text can be di
 ## Using it from code
 
 ```ts
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 import { audit, parseConfig, writeHtmlReport } from '@miraya/cli'
 
 const config = parseConfig({ baseUrl: 'http://localhost:3000', routes: ['/'] })

@@ -1,5 +1,5 @@
 import pixelmatch from 'pixelmatch'
-import { z } from 'zod'
+import * as z from 'zod'
 import type { Finding, RGBAImage } from '../types'
 import { defineRule, isIgnored, round } from './util'
 

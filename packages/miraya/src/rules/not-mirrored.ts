@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import type { Box, ElementSnap, MatchMethod, Snapshot } from '../types'
 import { defineRule, isIgnored, round } from './util'
 

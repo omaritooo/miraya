@@ -1,6 +1,6 @@
 {
   "name": "@miraya/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Finds the bugs that only exist in the right-to-left version of a web app.",
   "license": "MIT",
   "author": "omaritooo",
@@ -63,7 +63,6 @@
     "jiti": "^2.7.0",
     "picomatch": "^4.0.7",
     "pixelmatch": "^8.0.0",
-    "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
     "zod": "^4.6.5"
   },
@@ -86,6 +85,9 @@
     "vite": "^8.3.3",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.11"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.50.0"
   },
   "bin": {
     "miraya": "./dist/cli.js"

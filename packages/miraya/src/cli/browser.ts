@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser } from '@playwright/test'
 import { ConfigError } from '../core'
 
 const MISSING = /Executable doesn't exist|install(ed)? (the )?browsers?|playwright install/i
@@ -13,12 +13,20 @@ export async function launch(options: { headless?: boolean } = {}): Promise<Brow
   } catch (error) {
     if (!(error instanceof Error) || !MISSING.test(error.message)) throw error
   }
-  process.stderr.write('Chromium for Playwright is missing. Downloading it once (about 150 MB)…\n')
+  // Audits run headless, which needs only the smaller headless shell.
+  const shell = options.headless !== false
+  process.stderr.write(
+    `Playwright's ${shell ? 'headless Chromium' : 'Chromium'} is missing. Downloading it once…\n`,
+  )
   const cli = join(
-    dirname(createRequire(import.meta.url).resolve('playwright/package.json')),
+    dirname(createRequire(import.meta.url).resolve('@playwright/test/package.json')),
     'cli.js',
   )
-  const result = spawnSync(process.execPath, [cli, 'install', 'chromium'], { stdio: 'inherit' })
+  const result = spawnSync(
+    process.execPath,
+    [cli, 'install', 'chromium', ...(shell ? ['--only-shell'] : [])],
+    { stdio: 'inherit' },
+  )
   if (result.status !== 0) {
     throw new ConfigError(
       "Couldn't download Chromium. Run `npx playwright install chromium` (on Linux CI, add --with-deps) and try again.",

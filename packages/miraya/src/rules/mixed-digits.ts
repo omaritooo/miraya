@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import type { ElementSnap, Finding } from '../types'
 import { ancestors, defineRule, isIgnored } from './util'
 

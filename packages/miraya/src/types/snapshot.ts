@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 
 export const DirSchema = z.enum(['ltr', 'rtl'])
 export type Dir = z.infer<typeof DirSchema>

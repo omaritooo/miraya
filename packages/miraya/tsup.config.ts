@@ -9,12 +9,15 @@ const shared = {
 }
 
 export default defineConfig([
-  { ...shared, entry: ['src/index.ts'], format: ['esm', 'cjs'], clean: true },
+  // One ESM build for the library and the CLI, so they share a chunk instead of each
+  // carrying a copy of the engine.
   {
     ...shared,
-    entry: { cli: 'src/cli/index.ts' },
+    entry: { index: 'src/index.ts', cli: 'src/cli/bin.ts' },
     format: ['esm'],
-    dts: false,
-    banner: { js: '#!/usr/bin/env node' },
+    dts: { ...shared.dts, entry: { index: 'src/index.ts' } },
+    splitting: true,
+    clean: true,
   },
+  { ...shared, entry: ['src/index.ts'], format: ['cjs'], dts: shared.dts },
 ])

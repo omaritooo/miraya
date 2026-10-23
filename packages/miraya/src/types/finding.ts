@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import { BoxSchema, MatchMethodSchema } from './snapshot'
 
 export const SeveritySchema = z.enum(['info', 'warn', 'error'])
