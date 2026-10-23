@@ -22,6 +22,13 @@ export const SwitchToSchema = z.union([
       domain: z.string().optional(),
     }),
     z.object({ strategy: z.literal('context-locale'), ltr: z.string(), rtl: z.string() }),
+    z.object({
+      strategy: z.literal('local-storage'),
+      /** The localStorage key the app reads its language from, like `i18nextLng`. */
+      key: z.string(),
+      ltr: z.string(),
+      rtl: z.string(),
+    }),
     z.object({ strategy: z.literal('attribute') }),
   ]),
   z.custom<CustomSwitch>((v) => typeof v === 'function', 'Expected a switch function'),

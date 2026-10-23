@@ -55,14 +55,15 @@ You get a summary in the terminal, `.miraya/report.json`, and `.miraya/report.ht
 
 Set `locale` to match your app:
 
-| Strategy         | Example                                                                 | Use when                                               |
-| ---------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
-| `path-prefix`    | `{ strategy: 'path-prefix', ltr: '/en', rtl: '/ar' }`                   | The locale is in the path: `/ar/pricing`               |
-| `query`          | `{ strategy: 'query', param: 'lang', ltr: 'en', rtl: 'ar' }`            | The locale is a query parameter: `/pricing?lang=ar`    |
-| `cookie`         | `{ strategy: 'cookie', name: 'locale', ltr: 'en', rtl: 'ar' }`          | A cookie picks the locale (Nuxt i18n, many Rails apps) |
-| `context-locale` | `{ strategy: 'context-locale', ltr: 'en-US', rtl: 'ar-EG' }`            | The app reads the browser's language                   |
-| `attribute`      | `{ strategy: 'attribute' }`                                             | Default. Sets `dir="rtl"` on `<html>`; no translation  |
-| A function       | `(dir, { page, route }) => \`/${dir === 'rtl' ? 'ar' : 'en'}${route}\`` | Anything else: return a URL, or drive `page` yourself  |
+| Strategy         | Example                                                                  | Use when                                                                                    |
+| ---------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `path-prefix`    | `{ strategy: 'path-prefix', ltr: '/en', rtl: '/ar' }`                    | The locale is in the path: `/ar/pricing`                                                    |
+| `query`          | `{ strategy: 'query', param: 'lang', ltr: 'en', rtl: 'ar' }`             | The locale is a query parameter: `/pricing?lang=ar`                                         |
+| `cookie`         | `{ strategy: 'cookie', name: 'locale', ltr: 'en', rtl: 'ar' }`           | A cookie picks the locale (Nuxt i18n, many Rails apps)                                      |
+| `local-storage`  | `{ strategy: 'local-storage', key: 'i18nextLng', ltr: 'en', rtl: 'ar' }` | The app reads its language from localStorage (i18next's language detector, many React apps) |
+| `context-locale` | `{ strategy: 'context-locale', ltr: 'en-US', rtl: 'ar-EG' }`             | The app reads the browser's language                                                        |
+| `attribute`      | `{ strategy: 'attribute' }`                                              | Default. Sets `dir="rtl"` on `<html>`; no translation                                       |
+| A function       | `(dir, { page, route }) => \`/${dir === 'rtl' ? 'ar' : 'en'}${route}\``  | Anything else: return a URL, or drive `page` yourself                                       |
 
 `attribute` only flips the layout of the English page, so the text stays English: `untranslated-text` and the `lang` check are skipped, and the font rules have no Arabic to look at. Use it to check the layout of an app that has no translations yet.
 
@@ -76,7 +77,7 @@ Everything except `baseUrl` is optional.
 | `routes`                  |                             | Paths to audit, each starting with `/`.                                                                                                                                                 |
 | `crawl`                   |                             | `{ start, maxDepth, maxRoutes, include, exclude }`: find routes by following links. Use with `--crawl`.                                                                                 |
 | `locale`                  | `{ strategy: 'attribute' }` | How to switch direction. See above.                                                                                                                                                     |
-| `auth.storageState`       |                             | A Playwright storage state file, for pages behind a login.                                                                                                                              |
+| `auth.storageState`       |                             | A saved session, for pages behind a login. `npx miraya login` makes one; see [Pages behind a login](#pages-behind-a-login).                                                             |
 | `auth.loginUrlPattern`    |                             | If a route redirects here, it's reported as failed instead of auditing the login page.                                                                                                  |
 | `viewport`                | `{ w: 1280, h: 800 }`       | Browser size.                                                                                                                                                                           |
 | `maxPageHeight`           | `15000`                     | Screenshots stop here.                                                                                                                                                                  |
@@ -97,6 +98,7 @@ The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gi
 ```sh
 npx miraya init                      # write a config for this project
 npx miraya init --print              # show the config it would write, change nothing
+npx miraya login                     # sign in by hand and save the session
 npx miraya audit                     # audit the config routes
 npx miraya audit -r /pricing         # just this route
 npx miraya audit --crawl             # find routes by following links
@@ -107,6 +109,22 @@ npx miraya rules                     # list the rules
 ```
 
 `audit` exits with `0` when there are no new errors, `1` when there are, and `2` when a page couldn't be audited (pass `--allow-errors` to report those without failing). Run `npx miraya audit --help` for every option.
+
+## Pages behind a login
+
+Sign in once, by hand, and Miraya reuses the session:
+
+```sh
+npx miraya login
+```
+
+A browser window opens on your app (at `auth.loginUrlPattern`, if set). Sign in as you normally would, then press Enter in the terminal, or close the window. Miraya saves the cookies and localStorage to `.miraya/auth.json` and tells you what to add to the config:
+
+```ts
+auth: { storageState: '.miraya/auth.json', loginUrlPattern: '/login' },
+```
+
+With `loginUrlPattern` set, a route that redirects to the login page fails with a clear error instead of auditing the login form, so an expired session is easy to spot: run `miraya login` again. The file signs in as you, so keep it out of git; `miraya init` adds `.miraya/` to `.gitignore`.
 
 ## Baselines
 

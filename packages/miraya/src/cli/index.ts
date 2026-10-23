@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
+import { createInterface } from 'node:readline'
 import { chromium } from '@playwright/test'
 import { Command, Option } from 'commander'
 import pkg from '../../package.json'
@@ -18,11 +19,13 @@ import {
   renderConfig,
   resolveRules,
   routeSlug,
+  signIn,
   updateBaseline,
   writeBaseline,
   writeGithubOutput,
   writeHtmlReport,
   writeReport,
+  writeSession,
 } from '../core'
 import { ReportSchema, type Report, type ResolvedConfig } from '../types'
 
@@ -133,6 +136,45 @@ program
       out('Added .miraya/ to .gitignore')
     }
     out('\nStart your app, then run: npx miraya audit')
+  })
+
+program
+  .command('login')
+  .description(
+    'Sign in to the app in a browser window and save the session, for pages behind a login.',
+  )
+  .argument('[route]', 'where to start (default: auth.loginUrlPattern, or /)')
+  .option('-c, --config <path>', 'config file')
+  .option('--base-url <url>', 'override the config baseUrl')
+  .option(
+    '-o, --out <file>',
+    'where to save the session (default: auth.storageState, or .miraya/auth.json)',
+  )
+  .action(async (route: string | undefined, opts) => {
+    const config = await loadCliConfig(opts)
+    const file = opts.out ?? config.auth.storageState ?? '.miraya/auth.json'
+    const start = route ?? config.auth.loginUrlPattern ?? '/'
+    out(`Opening ${new URL(start, config.baseUrl).href}`)
+    out('Sign in in the browser window, then press Enter here (or close the window).')
+    const terminal = createInterface({ input: process.stdin })
+    const entered = new Promise((done) => terminal.once('line', done))
+    const browser = await chromium.launch({ headless: false })
+    try {
+      const state = await signIn({ browser, config, route: start, done: entered })
+      const saved = writeSession(file, state)
+      out(
+        `Saved the session to ${relative(process.cwd(), saved) || saved}: ${state.cookies.length} cookies, localStorage for ${state.origins.length} ${state.origins.length === 1 ? 'origin' : 'origins'}.`,
+      )
+      out('It signs in as you: keep it out of git. (.miraya/ is ignored if you ran `miraya init`.)')
+      if (!config.auth.storageState) {
+        out(
+          `\nAdd it to the config:\n  auth: { storageState: '${relative(process.cwd(), saved) || saved}' },`,
+        )
+      }
+    } finally {
+      terminal.close()
+      await browser.close()
+    }
   })
 
 program

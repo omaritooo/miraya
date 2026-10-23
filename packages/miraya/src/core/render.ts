@@ -134,6 +134,13 @@ export async function open(
       return goto(route)
     case 'context-locale':
       return goto(route)
+    case 'local-storage':
+      // Before any of the app's scripts run, so it reads the language on its first render.
+      await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+        locale.key,
+        dir === 'ltr' ? locale.ltr : locale.rtl,
+      ] as const)
+      return goto(route)
     case 'attribute': {
       const url = await goto(route)
       const lang = dir === 'rtl' ? (config.languages.rtl[0] ?? 'ar') : 'en'

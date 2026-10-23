@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Storage</title>
+    <link rel="stylesheet" href="/src/site.css" />
+  </head>
+  <body>
+    <!-- One URL for both languages: the app reads the language from localStorage, as many
+         React apps do with i18next's language detector. -->
+    <main data-testid="main"><h1 data-testid="heading"></h1></main>
+    <script>
+      const lang = localStorage.getItem('appLanguage') === 'ar' ? 'ar' : 'en'
+      document.documentElement.lang = lang
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
+      document.querySelector('h1').textContent = lang === 'ar' ? 'المتجر' : 'Shop'
+    </script>
+  </body>
+</html>

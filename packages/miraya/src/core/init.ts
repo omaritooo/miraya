@@ -126,8 +126,22 @@ function routesFrom(dir: string, framework: Framework | undefined) {
 }
 
 /** Finds an English and an RTL translation file, or folder of them, side by side. */
+const BUILD_DIRS = new Set(['node_modules', 'dist', 'build', 'coverage', 'out'])
+
+/** Folders up to `depth` levels down, skipping dependencies and build output. */
+function folders(dir: string, depth: number, rel = ''): string[] {
+  if (depth < 0) return []
+  return readdirSync(join(dir, rel), { withFileTypes: true }).flatMap((d) => {
+    if (!d.isDirectory() || d.name.startsWith('.') || BUILD_DIRS.has(d.name)) return []
+    const sub = rel ? `${rel}/${d.name}` : d.name
+    return [sub, ...folders(dir, depth - 1, sub)]
+  })
+}
+
 function localesIn(dir: string) {
-  for (const base of LOCALE_DIRS) {
+  // The usual places first; then any folder, a few levels down, with both languages in it.
+  const candidates = [...LOCALE_DIRS, ...folders(dir, 4).filter((f) => !LOCALE_DIRS.includes(f))]
+  for (const base of candidates) {
     const path = join(dir, base)
     if (!existsSync(path) || !statSync(path).isDirectory()) continue
     const entries = readdirSync(path, { withFileTypes: true })
@@ -146,6 +160,19 @@ function localesIn(dir: string) {
         codes: { ltr: code(ltr), rtl: code(rtl) },
       }
     }
+  }
+  return undefined
+}
+
+const SOURCE_FILE = /\.(tsx?|jsx?|vue|svelte)$/
+const STORAGE_READ = /localStorage\.getItem\(\s*['"`]([^'"`]*(?:lang|locale|lng)[^'"`]*)['"`]/i
+
+/** A localStorage key the app's own code reads its language from, like selectedLanguage. */
+function storageKey(dir: string): string | undefined {
+  for (const file of files(join(dir, 'src'))) {
+    if (!SOURCE_FILE.test(file)) continue
+    const key = STORAGE_READ.exec(readFileSync(file, 'utf8'))?.[1]
+    if (key) return key
   }
   return undefined
 }
@@ -231,6 +258,14 @@ export function detectProject(dir: string): Detected {
     notes.push(
       'Next.js i18n routing: the locale is in the path, the default locale without a prefix.',
     )
+  } else if (deps['i18next-browser-languagedetector']) {
+    // The detector's default cache: localStorage, under i18nextLng.
+    locale = { strategy: 'local-storage', key: 'i18nextLng', ltr: codes.ltr, rtl: codes.rtl }
+    notes.push("i18next's language detector: the language is in localStorage, under i18nextLng.")
+  } else if (storageKey(dir)) {
+    const key = storageKey(dir) as string
+    locale = { strategy: 'local-storage', key, ltr: codes.ltr, rtl: codes.rtl }
+    notes.push(`The app reads its language from localStorage, under ${key}.`)
   } else if (staticLocaleDirs(dir)) {
     const found = staticLocaleDirs(dir) as { ltr: string; rtl: string }
     locale = { strategy: 'path-prefix', ltr: `/${found.ltr}`, rtl: `/${found.rtl}` }

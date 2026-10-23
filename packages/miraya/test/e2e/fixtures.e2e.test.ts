@@ -15,7 +15,7 @@ import {
   writeReport,
   type Report,
 } from '../../src'
-import { crawl } from '../../src/core'
+import { crawl, signIn } from '../../src/core'
 import { FIXTURE_URL } from './fixture-server'
 
 // The precision test: every fixture page must produce exactly its labelled findings,
@@ -246,5 +246,66 @@ describe('pages that crash', () => {
       /page rendered (nothing|no text), after a page error: .*Missing environment variables/,
     )
     expect(exitCode(result)).toBe(2)
+  })
+})
+
+describe('the local-storage switch', () => {
+  it('sets the key before the app reads it', async () => {
+    const result = await audit({
+      config: parseConfig({
+        ...config,
+        locale: { strategy: 'local-storage', key: 'appLanguage', ltr: 'en', rtl: 'ar' },
+      }),
+      routes: ['/storage'],
+      browser,
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-storage-')),
+    })
+    const route = result.routes[0]
+    expect(route?.errors).toEqual([])
+    expect(route?.findings).toEqual([])
+    expect(route?.skippedRules).toEqual([])
+  })
+})
+
+describe('signing in', () => {
+  // What a sign-in leaves behind: a session cookie and a token in localStorage.
+  const signInOnPage = async (page: import('@playwright/test').Page) => {
+    await page.evaluate(() => {
+      document.cookie = 'session=abc; path=/'
+      localStorage.setItem('token', 'xyz')
+    })
+  }
+
+  it('saves the session when the person says they are done', async () => {
+    let finish = () => {}
+    const done = new Promise<void>((resolve) => (finish = resolve))
+    const state = await signIn({
+      browser,
+      config,
+      route: '/storage',
+      done,
+      onPage: async (page) => {
+        await signInOnPage(page)
+        finish()
+      },
+    })
+    expect(state.cookies.map((c) => [c.name, c.value])).toEqual([['session', 'abc']])
+    expect(state.origins[0]?.localStorage).toContainEqual({ name: 'token', value: 'xyz' })
+  })
+
+  it('keeps the session when the window is closed instead', async () => {
+    const state = await signIn({
+      browser,
+      config,
+      route: '/storage',
+      done: new Promise(() => {}),
+      onPage: async (page) => {
+        await signInOnPage(page)
+        // Give the copy a moment, as a person would take, then close the window.
+        await page.waitForTimeout(700)
+        await page.close()
+      },
+    })
+    expect(state.cookies.map((c) => c.name)).toEqual(['session'])
   })
 })

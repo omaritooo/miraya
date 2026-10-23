@@ -140,3 +140,38 @@ describe('static sites', () => {
     })
   })
 })
+
+describe('localStorage apps', () => {
+  it("reads i18next's language detector", () => {
+    const dir = project({
+      'package.json': {
+        dependencies: {
+          react: '19',
+          vite: '7',
+          i18next: '25',
+          'i18next-browser-languagedetector': '8',
+        },
+      },
+    })
+    expect(detectProject(dir).locale).toEqual({
+      strategy: 'local-storage',
+      key: 'i18nextLng',
+      ltr: 'en',
+      rtl: 'ar',
+    })
+  })
+
+  it("finds the app's own key and translations kept somewhere unusual", () => {
+    const dir = project({
+      'package.json': { dependencies: { react: '19', vite: '7', i18next: '25' } },
+      'src/components/LanguageSwitcher.tsx':
+        'const saved = localStorage.getItem("selectedLanguage")',
+      'src/data/locals/en/common/forms.json': {},
+      'src/data/locals/ar/common/forms.json': {},
+    })
+    expect(detectProject(dir)).toMatchObject({
+      locale: { strategy: 'local-storage', key: 'selectedLanguage' },
+      locales: { ltr: './src/data/locals/en', rtl: './src/data/locals/ar' },
+    })
+  })
+})

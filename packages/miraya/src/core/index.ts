@@ -11,6 +11,7 @@ export {
 export { ConfigError, DOCS_BASE_URL, fingerprint, resolveRules, runRules } from './engine'
 export { loadTranslations } from './translations'
 export { detectProject, renderConfig, type Detected } from './init'
+export { signIn, writeSession, type SignInOptions } from './login'
 export { consistent, pairSnapshots, type PairingStats } from './pair'
 export { applyBaseline, readBaseline, updateBaseline, writeBaseline } from './baseline'
 export { crawl, normaliseLink } from './crawl'
