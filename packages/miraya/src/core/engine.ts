@@ -12,6 +12,7 @@ import type {
   RuleContext,
   Severity,
   SnapshotPair,
+  Translations,
 } from '../types'
 
 // Each rule has a section in the package README whose anchor is the rule id.
@@ -90,6 +91,7 @@ export function runRules(
   resolved: ResolvedRule[],
   config: ResolvedConfig,
   crops: { ltr?: CropCache; rtl?: CropCache } = {},
+  translations?: Translations,
 ): RuleRun {
   const ltrByKey = new Map((pair.ltr?.elements ?? []).map((el) => [el.key, el]))
   const rtlByKey = new Map(pair.rtl.elements.map((el) => [el.key, el]))
@@ -123,6 +125,7 @@ export function runRules(
         return m && el ? { el, method: m.method } : undefined
       },
       crop: (dir, key) => crops[dir]?.get(key) ?? null,
+      ...(translations ? { translations } : {}),
       finding: (input) => {
         let level = severity
         if (input.severity && SEVERITY_RANK[input.severity] < SEVERITY_RANK[level]) {

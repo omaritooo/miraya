@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { evidenceLabel, ruleFix, ruleTitle, SEVERITY_WORDS } from './copy'
+import { evidenceLabel, ruleFix, ruleTitle, SEVERITY_WORDS, TRANSLATION_STATUS } from './copy'
 import type { Finding, RouteResult } from './data'
 
 export function Inspector({
@@ -73,10 +73,14 @@ export function Inspector({
   )
 }
 
+// Translation facts have their own rows in the detail.
+const SHOWN_ABOVE = new Set(['translation', 'translationKey', 'translationFile'])
+
 function Detail({ finding }: { finding: Finding }) {
   const command = `npx miraya explain ${finding.id.slice(0, 10)}`
   const [copied, setCopied] = useState(false)
-  const fix = ruleFix(finding.rule)
+  const fix = ruleFix(finding)
+  const { translation, translationKey, translationFile } = finding.evidence
   return (
     <article className="detail" aria-labelledby="detail-title">
       <p className={`detail-severity sev-${finding.severity}`}>
@@ -98,6 +102,25 @@ function Detail({ finding }: { finding: Finding }) {
             <code dir="ltr">{finding.selector}</code>
           </dd>
         </div>
+        {typeof translation === 'string' ? (
+          <>
+            {translationKey !== undefined ? (
+              <div>
+                <dt>Key</dt>
+                <dd>
+                  <code dir="ltr">{String(translationKey)}</code>
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>File</dt>
+              <dd>
+                {TRANSLATION_STATUS[translation] ?? translation}{' '}
+                <code dir="ltr">{String(translationFile)}</code>
+              </dd>
+            </div>
+          </>
+        ) : null}
         {finding.sourceHint ? (
           <div>
             <dt>Source</dt>
@@ -111,12 +134,14 @@ function Detail({ finding }: { finding: Finding }) {
         <summary>Measurements</summary>
         <table className="evidence">
           <tbody>
-            {Object.entries(finding.evidence).map(([key, value]) => (
-              <tr key={key}>
-                <th scope="row">{evidenceLabel(key)}</th>
-                <td dir="ltr">{String(value)}</td>
-              </tr>
-            ))}
+            {Object.entries(finding.evidence)
+              .filter(([key]) => !SHOWN_ABOVE.has(key))
+              .map(([key, value]) => (
+                <tr key={key}>
+                  <th scope="row">{evidenceLabel(key)}</th>
+                  <td dir="ltr">{String(value)}</td>
+                </tr>
+              ))}
             {finding.match ? (
               <tr>
                 <th scope="row">Matched to English by</th>

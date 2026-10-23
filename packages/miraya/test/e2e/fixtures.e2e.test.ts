@@ -206,3 +206,27 @@ describe('pages that reload during the audit', () => {
     expect(route?.notes.some((n) => n.includes('reloaded during the audit'))).toBe(true)
   })
 })
+
+describe('translation files', () => {
+  it('names the key and the file for each untranslated string', async () => {
+    const locales = fileURLToPath(new URL('../../../../fixtures/site/locales/', import.meta.url))
+    const result = await audit({
+      config: parseConfig({
+        ...config,
+        locales: { ltr: join(locales, 'en.json'), rtl: join(locales, 'ar.json') },
+      }),
+      routes: ['/untranslated-text/bad'],
+      browser,
+      only: ['untranslated-text'],
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-locales-')),
+    })
+    const findings = result.routes[0]?.findings ?? []
+    expect(
+      findings.map((f) => [f.evidence.text, f.evidence.translation, f.evidence.translationKey]),
+    ).toEqual([
+      ['Add to cart', 'missing', 'shop.addToCart'],
+      ['Free shipping on all orders', 'not-found', undefined],
+    ])
+    expect(findings[0]?.evidence.translationFile).toMatch(/fixtures\/site\/locales\/ar\.json$/)
+  })
+})

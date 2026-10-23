@@ -2,6 +2,7 @@ import type { ZodType } from 'zod'
 import type { ResolvedConfig } from './config'
 import type { Finding, Severity } from './finding'
 import type { Dir, ElementSnap, MatchMethod, SnapshotPair } from './snapshot'
+import type { Translations } from './translations'
 
 export type RGBAImage = { width: number; height: number; data: Uint8Array }
 
@@ -36,6 +37,8 @@ export type RuleContext<O> = {
   /** Synchronous, from the crop cache; null if not cached. */
   crop(dir: Dir, key: string): RGBAImage | null
   finding(input: FindingInput): Finding
+  /** Present when config.locales points at the app's translation files. */
+  translations?: Translations
 }
 
 export type Rule<O = unknown> = {

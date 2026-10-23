@@ -509,6 +509,8 @@ kbd {
 
 .detail {
   display: grid;
+  /* minmax(0, …): long paths and selectors wrap instead of widening the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding: 16px;
 }
@@ -530,6 +532,7 @@ kbd {
 }
 .detail-message {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 .fix {
   padding: 10px 12px;

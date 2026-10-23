@@ -83,6 +83,11 @@ export const ConfigSchema = z.object({
       latin: z.array(z.string()).default([]),
     })
     .prefault({}),
+  /**
+   * The app's translation files, so untranslated text can name its key and the file to
+   * edit. Each is a JSON file, or a folder of JSON files (one per namespace).
+   */
+  locales: z.object({ ltr: z.string(), rtl: z.string() }).optional(),
   allow: z.object({ latinText: z.array(z.string()).default([]) }).prefault({}),
   source: z.object({ attribute: z.string().optional() }).prefault({}),
   rules: z.record(z.string(), RuleSettingSchema).default({}),

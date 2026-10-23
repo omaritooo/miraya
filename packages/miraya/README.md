@@ -22,7 +22,15 @@ Node 20 or later. Miraya drives Chromium through Playwright, which you install a
 
 ## Quick start
 
-Create `miraya.config.ts` in your project:
+In your project, run:
+
+```sh
+npx miraya init
+```
+
+It reads your framework (Next.js, Nuxt, SvelteKit, Astro or Vite), your i18n setup and your page files, and writes `miraya.config.ts` with each guess explained in a comment. Pages with parameters, like `/products/[id]`, are left commented out for you to fill in with a real page. If your routes don't come from files, start the app and run `npx miraya init --crawl` to find them by following links.
+
+Or write the config yourself:
 
 ```ts
 import { defineConfig } from '@miraya/cli'
@@ -62,30 +70,32 @@ Set `locale` to match your app:
 
 Everything except `baseUrl` is optional.
 
-| Option                    | Default                     | What it does                                                                                            |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `baseUrl`                 |                             | Where your app is running.                                                                              |
-| `routes`                  |                             | Paths to audit, each starting with `/`.                                                                 |
-| `crawl`                   |                             | `{ start, maxDepth, maxRoutes, include, exclude }`: find routes by following links. Use with `--crawl`. |
-| `locale`                  | `{ strategy: 'attribute' }` | How to switch direction. See above.                                                                     |
-| `auth.storageState`       |                             | A Playwright storage state file, for pages behind a login.                                              |
-| `auth.loginUrlPattern`    |                             | If a route redirects here, it's reported as failed instead of auditing the login page.                  |
-| `viewport`                | `{ w: 1280, h: 800 }`       | Browser size.                                                                                           |
-| `maxPageHeight`           | `15000`                     | Screenshots stop here.                                                                                  |
-| `scrollToLoad`            | `false`                     | Scroll the page first, for content that loads on scroll.                                                |
-| `pairing.testIdAttribute` | `'data-testid'`             | Elements with the same test id are paired first. Add test ids to anything Miraya pairs wrongly.         |
-| `fonts.arabic`            | `[]`                        | Font families you ship for Arabic. Anything else drawing Arabic is a fallback.                          |
-| `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                           |
-| `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                   |
-| `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                               |
-| `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                            |
-| `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                        |
+| Option                    | Default                     | What it does                                                                                                                                                                            |
+| ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUrl`                 |                             | Where your app is running.                                                                                                                                                              |
+| `routes`                  |                             | Paths to audit, each starting with `/`.                                                                                                                                                 |
+| `crawl`                   |                             | `{ start, maxDepth, maxRoutes, include, exclude }`: find routes by following links. Use with `--crawl`.                                                                                 |
+| `locale`                  | `{ strategy: 'attribute' }` | How to switch direction. See above.                                                                                                                                                     |
+| `auth.storageState`       |                             | A Playwright storage state file, for pages behind a login.                                                                                                                              |
+| `auth.loginUrlPattern`    |                             | If a route redirects here, it's reported as failed instead of auditing the login page.                                                                                                  |
+| `viewport`                | `{ w: 1280, h: 800 }`       | Browser size.                                                                                                                                                                           |
+| `maxPageHeight`           | `15000`                     | Screenshots stop here.                                                                                                                                                                  |
+| `scrollToLoad`            | `false`                     | Scroll the page first, for content that loads on scroll.                                                                                                                                |
+| `pairing.testIdAttribute` | `'data-testid'`             | Elements with the same test id are paired first. Add test ids to anything Miraya pairs wrongly.                                                                                         |
+| `fonts.arabic`            | `[]`                        | Font families you ship for Arabic. Anything else drawing Arabic is a fallback.                                                                                                          |
+| `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                           |
+| `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files). |
+| `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                   |
+| `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                               |
+| `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                            |
+| `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                        |
 
 The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gives you types and autocomplete. JSON Schemas for the report and the baseline ship in `@miraya/cli/schema/`.
 
 ## Commands
 
 ```sh
+npx miraya init                      # write a config for this project
 npx miraya audit                     # audit the config routes
 npx miraya audit -r /pricing         # just this route
 npx miraya audit --crawl             # find routes by following links
@@ -106,6 +116,25 @@ npx miraya baseline update
 ```
 
 This writes `.miraya-baseline.json`. Commit it. From then on, accepted findings show as "known" in the report and don't fail the run; only new ones do. When you fix one, the report lists it as fixed. Findings are matched by what they are, not where they are, so moving an element doesn't make its finding new.
+
+## Translation files
+
+Point Miraya at your translation files, and each piece of English on the Arabic page comes with where to fix it:
+
+```ts
+locales: { ltr: './locales/en.json', rtl: './locales/ar.json' },
+```
+
+Miraya finds the English text's key in the English file and checks the Arabic one:
+
+| In the report               | Means                                                          | Fix                                                                    |
+| --------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Missing from** a file     | The key `checkout.payNow` isn't in the Arabic file             | Add it, translated                                                     |
+| **Still English in**        | The Arabic file has the key, but its value is the English text | Translate the value                                                    |
+| **Translated in**           | The Arabic file translates it, yet the page shows English      | Check that the Arabic file loads on that page, and the key in the code |
+| **Not in** the English file | No key has this text                                           | It's written into a component: move it into the translation files      |
+
+Each one is a JSON file (nested or flat keys), or a folder of JSON files with one per namespace, like `locales/en/checkout.json`. Keys from a folder are shown i18next-style, `checkout:payNow`. Placeholders such as `{name}`, `{{count}}` and `%s` match whatever the page filled in. ICU plural and select messages aren't matched yet. `miraya init` fills this in when it finds the files.
 
 ## Ignoring an element
 
@@ -199,7 +228,7 @@ Arabic text is cut off by its box. Arabic letters reach higher and lower than La
 
 English text in the Arabic page, usually a string that missed translation.
 
-**Fix:** translate the string. Brand and product names that stay in English go in `allow.latinText`.
+**Fix:** translate the string. Brand and product names that stay in English go in `allow.latinText`. With [translation files](#translation-files) set up, each finding says which key to fix and in which file.
 
 **Options:** `minWords` (2): shorter text is ignored.
 

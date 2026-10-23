@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ElementSnap, Finding } from '../types'
+import type { ElementSnap, Finding, TranslationMatch } from '../types'
 import { ancestors, defineRule, isIgnored, shortHash } from './util'
 
 const ID = 'untranslated-text'
@@ -51,20 +51,47 @@ export default defineRule({
 
     const findings: Finding[] = []
     for (const [normalised, { el, text, count }] of byText) {
+      const found = ctx.translations?.lookup(text)
+      const shown =
+        count > 1
+          ? `English text in the Arabic UI, ${count} times: "${text.slice(0, 80)}".`
+          : `English text in the Arabic UI: "${text.slice(0, 80)}".`
       findings.push(
         ctx.finding({
           rule: ID,
           route: pair.route,
           selector: el.selector,
           boxes: { rtl: el.box },
-          message:
-            count > 1
-              ? `English text in the Arabic UI, ${count} times: "${text.slice(0, 80)}".`
-              : `English text in the Arabic UI: "${text.slice(0, 80)}".`,
-          evidence: { text: text.slice(0, 80), textHash: shortHash(normalised), count },
+          message: found ? `${shown} ${where(found)}` : shown,
+          evidence: {
+            text: text.slice(0, 80),
+            textHash: shortHash(normalised),
+            count,
+            ...(found
+              ? {
+                  translation: found.status,
+                  ...(found.key ? { translationKey: found.key } : {}),
+                  translationFile: found.file,
+                }
+              : {}),
+          },
         }),
       )
     }
     return findings
   },
 })
+
+/** Where to fix it, in the app's translation files. */
+function where({ status, key, file }: TranslationMatch): string {
+  switch (status) {
+    case 'missing':
+      return `The key "${key}" is missing from ${file}.`
+    case 'copied':
+      return `"${key}" in ${file} still holds the English text.`
+    case 'fallback':
+      return `${file} translates "${key}", but the page shows the English: check that the Arabic file loads here.`
+    case 'not-found':
+      return `It isn't in ${file}, so it's probably written into a component.`
+  }
+}

@@ -45,7 +45,29 @@ const RULES: Record<string, { title: string; fix: string }> = {
 }
 
 export const ruleTitle = (rule: string) => RULES[rule]?.title ?? rule
-export const ruleFix = (rule: string) => RULES[rule]?.fix
+
+/** untranslated-text with config.locales: the fix depends on where the string stands. */
+const TRANSLATION_FIX: Record<string, string> = {
+  missing: 'Add the key to the Arabic file with its translation.',
+  copied: 'Replace the English value in the Arabic file with the translation.',
+  fallback:
+    "The Arabic file already translates this. Check that it's loaded on this page, and that the key in the code matches.",
+  'not-found':
+    "The text isn't in the English file, so it's probably written into a component. Move it into the translation files and translate it.",
+}
+
+export function ruleFix(finding: Finding): string | undefined {
+  const status = finding.evidence.translation
+  if (typeof status === 'string' && TRANSLATION_FIX[status]) return TRANSLATION_FIX[status]
+  return RULES[finding.rule]?.fix
+}
+
+export const TRANSLATION_STATUS: Record<string, string> = {
+  missing: 'Missing from',
+  copied: 'Still English in',
+  fallback: 'Translated in',
+  'not-found': 'Not in',
+}
 
 export const SEVERITY_WORDS: Record<Severity, string> = {
   error: 'Must fix',
@@ -95,6 +117,9 @@ const EVIDENCE: Record<string, string> = {
   dir: 'dir',
   lang: 'lang',
   bodyDirection: 'Direction of the page body',
+  translation: 'Translation',
+  translationKey: 'Key',
+  translationFile: 'File',
 }
 export const evidenceLabel = (key: string) => EVIDENCE[key] ?? key
 

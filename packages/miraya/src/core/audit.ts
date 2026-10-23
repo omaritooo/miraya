@@ -18,6 +18,7 @@ import type {
 import { ConfigError, resolveRules, runRules } from './engine'
 import { applyBaseline, readBaseline } from './baseline'
 import { buildCrops, screenshotFrame } from './crops'
+import { loadTranslations } from './translations'
 import { pairSnapshots, type PairingStats } from './pair'
 import {
   openContexts,
@@ -106,17 +107,18 @@ export async function audit(options: AuditOptions): Promise<Report> {
   if (routes.length === 0) throw new ConfigError('No routes to audit: set `routes` in the config')
   const rtlOnly = options.rtlOnly ?? false
 
-  let rules = options.rules ?? builtinRules
+  const rules = options.rules ?? builtinRules
   const only = options.only
   if (only) {
     const unknown = only.filter((id) => !rules.some((r) => r.meta.id === id))
     if (unknown.length) throw new ConfigError(`Unknown rule(s): ${unknown.join(', ')}`)
-    rules = rules.filter((r) => only.includes(r.meta.id))
   }
-  const resolved = resolveRules(rules, config)
+  // Resolve against every rule, so the config may name rules that `only` leaves out.
+  const resolved = resolveRules(rules, config).filter((r) => !only || only.includes(r.rule.meta.id))
   // Read the baseline up front, so a broken file fails the run before any browser work.
   const baselinePath = options.baseline ?? config.baseline
   const baseline = baselinePath === false ? undefined : readBaseline(resolve(baselinePath))
+  const translations = loadTranslations(config)
 
   const given = options.context?.browser() ?? options.browser
   const browser = given ?? (await chromium.launch({ headless: !options.headed }))
@@ -258,7 +260,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
               writeFileSync(file, `${JSON.stringify(r.snapshot, null, 2)}\n`)
             }
           }
-          const run = runRules(pair, resolved, config, crops)
+          const run = runRules(pair, resolved, config, crops, translations)
 
           const notes = [
             ...(ltr?.notes ?? []),

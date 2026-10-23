@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
 import { Command, Option } from 'commander'
@@ -8,12 +8,14 @@ import {
   builtinRules,
   ConfigError,
   crawl,
+  detectProject,
   DOCS_BASE_URL,
   exitCode,
   findConfig,
   parseConfig,
   readBaseline,
   readConfigFile,
+  renderConfig,
   resolveRules,
   routeSlug,
   updateBaseline,
@@ -87,6 +89,49 @@ const program = new Command()
   .description('Finds the bugs that only exist in the right-to-left version of a web app.')
   .version(pkg.version)
   .showHelpAfterError()
+
+program
+  .command('init')
+  .description('Write a miraya.config for this project, from its framework, i18n setup and pages.')
+  .option('--crawl', 'with the app running, find routes by following its links')
+  .option('--base-url <url>', 'where the app runs (default: guessed from the dev script)')
+  .option('--force', 'overwrite an existing config file')
+  .action(async (opts) => {
+    const dir = process.cwd()
+    const existing = findConfig(dir)
+    if (existing && !opts.force) {
+      throw new ConfigError(`${existing} already exists; pass --force to replace it`)
+    }
+    const detected = detectProject(dir)
+    if (opts.baseUrl) detected.baseUrl = opts.baseUrl
+    if (opts.crawl) {
+      const config = parseConfig({
+        baseUrl: detected.baseUrl,
+        locale: detected.locale,
+        crawl: {},
+      })
+      const browser = await chromium.launch()
+      try {
+        detected.routes = await crawl(browser, config)
+        detected.notes = detected.notes.filter((n) => !n.startsWith('No page files found'))
+      } finally {
+        await browser.close()
+      }
+      detected.notes.push(`${detected.routes.length} routes found by following links from /.`)
+    }
+    const file = join(dir, detected.typescript ? 'miraya.config.ts' : 'miraya.config.mjs')
+    writeFileSync(file, renderConfig(detected))
+    out(`Wrote ${file}`)
+    for (const note of detected.notes) out(`  ${note}`)
+
+    const gitignore = join(dir, '.gitignore')
+    const ignored = existsSync(gitignore) ? readFileSync(gitignore, 'utf8') : ''
+    if (!/^\/?\.miraya\/?$/m.test(ignored)) {
+      appendFileSync(gitignore, `${ignored && !ignored.endsWith('\n') ? '\n' : ''}.miraya/\n`)
+      out('Added .miraya/ to .gitignore')
+    }
+    out('\nStart your app, then run: npx miraya audit')
+  })
 
 program
   .command('audit')
