@@ -64,7 +64,7 @@ Set `locale` to match your app:
 | `attribute`      | `{ strategy: 'attribute' }`                                             | Default. Sets `dir="rtl"` on `<html>`; no translation  |
 | A function       | `(dir, { page, route }) => \`/${dir === 'rtl' ? 'ar' : 'en'}${route}\`` | Anything else: return a URL, or drive `page` yourself  |
 
-`attribute` only flips the layout, so the rules that need Arabic text (fonts, untranslated text) have nothing to check. Use it to try Miraya before your translations are in.
+`attribute` only flips the layout of the English page, so the text stays English: `untranslated-text` and the `lang` check are skipped, and the font rules have no Arabic to look at. Use it to check the layout of an app that has no translations yet.
 
 ## Configuration
 
@@ -96,6 +96,7 @@ The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gi
 
 ```sh
 npx miraya init                      # write a config for this project
+npx miraya init --print              # show the config it would write, change nothing
 npx miraya audit                     # audit the config routes
 npx miraya audit -r /pricing         # just this route
 npx miraya audit --crawl             # find routes by following links
@@ -135,6 +136,13 @@ Miraya finds the English text's key in the English file and checks the Arabic on
 | **Not in** the English file | No key has this text                                           | It's written into a component: move it into the translation files      |
 
 Each one is a JSON file (nested or flat keys), or a folder of JSON files with one per namespace, like `locales/en/checkout.json`. Keys from a folder are shown i18next-style, `checkout:payNow`. Placeholders such as `{name}`, `{{count}}` and `%s` match whatever the page filled in. ICU plural and select messages aren't matched yet. `miraya init` fills this in when it finds the files.
+
+## What Miraya leaves out
+
+- **Dev-server overlays.** Nuxt devtools, the Vue tracer, Next.js and Vite error overlays, and similar are skipped, since they aren't your app. Auditing a production build is still more faithful.
+- **Repeated copies.** A mistake in a repeated component, like a card in a grid, is reported once, on the first copy, with the number of copies.
+- **Pages that crashed.** If a page throws and draws no text, the route fails with the page's own error instead of reporting on an empty page.
+- **Direction on a wrapper.** If `<html>` has no `dir` but the app's root element is right-to-left, `document-direction` asks you to move `dir` to `<html>`, and the other rules still run.
 
 ## Ignoring an element
 

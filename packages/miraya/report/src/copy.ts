@@ -51,7 +51,7 @@ const TRANSLATION_FIX: Record<string, string> = {
   missing: 'Add the key to the Arabic file with its translation.',
   copied: 'Replace the English value in the Arabic file with the translation.',
   fallback:
-    "The Arabic file already translates this. Check that it's loaded on this page, and that the key in the code matches.",
+    'The Arabic file already translates this. Use the key in the component instead of the English text, and check that the Arabic file loads on this page.',
   'not-found':
     "The text isn't in the English file, so it's probably written into a component. Move it into the translation files and translate it.",
 }
@@ -117,6 +117,7 @@ const EVIDENCE: Record<string, string> = {
   dir: 'dir',
   lang: 'lang',
   bodyDirection: 'Direction of the page body',
+  copies: 'Copies of this element',
   translation: 'Translation',
   translationKey: 'Key',
   translationFile: 'File',

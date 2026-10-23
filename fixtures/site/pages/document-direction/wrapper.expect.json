@@ -1,0 +1,7 @@
+{
+  "route": "/document-direction/wrapper",
+  "expect": [
+    { "rule": "document-direction", "selector": "html" },
+    { "rule": "untranslated-text", "selector": "[data-testid=\"promo\"]" }
+  ]
+}

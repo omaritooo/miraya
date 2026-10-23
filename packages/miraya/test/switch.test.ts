@@ -61,7 +61,7 @@ describe('direction switchers', () => {
 
   it('attribute opens the route and sets dir and lang', async () => {
     const { page, calls } = stubPage()
-    await open(page, '/cart', 'rtl', config({ baseUrl: base }))
+    await open(page, '/cart', 'rtl', config({ baseUrl: base, locale: { strategy: 'attribute' } }))
     expect(calls.gotos).toEqual([`${base}/cart`])
     expect(calls.evaluated).toEqual([['rtl', 'ar']])
   })
@@ -100,6 +100,11 @@ describe('checkRedirect', () => {
 
   it('allows auditing the login page itself', () => {
     expect(() => checkRedirect(`${base}/ar/login`, `${base}/ar/login`, c)).not.toThrow()
+  })
+
+  it('allows the login page when a custom switch opened it, so the request is unknown', () => {
+    expect(() => checkRedirect(undefined, `${base}/login`, c, '/login')).not.toThrow()
+    expect(() => checkRedirect(undefined, `${base}/login`, c, '/cart')).toThrow(/storageState/)
   })
 
   it('fails on any other redirect', () => {

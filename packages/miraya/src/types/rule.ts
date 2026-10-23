@@ -16,6 +16,8 @@ export type RuleMeta = {
   /** Weakest pairing method the rule trusts at full severity. */
   minMatch?: MatchMethod
   experimental?: boolean
+  /** Checks translated content, so it's skipped with the `attribute` switch, which only flips the layout. */
+  needsTranslation?: boolean
   docs: string
 }
 

@@ -30,3 +30,20 @@ export function shortHash(text: string): string {
 }
 
 export const round = (n: number) => Math.round(n * 10) / 10
+
+/**
+ * The outermost element, other than <html> and <body>, that is right-to-left and covers
+ * at least half the page: apps often set dir on a root wrapper instead of <html>.
+ */
+export function rtlWrapper(snapshot: { elements: ElementSnap[] }): ElementSnap | undefined {
+  const page = snapshot.elements.find((el) => el.tag === 'html')?.box
+  const area = page ? page.w * page.h : 0
+  if (!area) return undefined
+  return snapshot.elements.find(
+    (el) =>
+      el.tag !== 'html' &&
+      el.tag !== 'body' &&
+      el.style.direction === 'rtl' &&
+      el.box.w * el.box.h >= area / 2,
+  )
+}

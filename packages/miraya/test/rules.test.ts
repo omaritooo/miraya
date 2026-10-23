@@ -241,3 +241,75 @@ describe('not-mirrored on inline text runs', () => {
     expect(audit(pair, 'not-mirrored')).toEqual([])
   })
 })
+
+describe('the attribute switch', () => {
+  // It flips the English page's layout, so the text is English and lang stays "en" by design.
+  const box = { x: 0, y: 0, w: 100, h: 20 }
+  const style = { ...el({ box }).style, direction: 'rtl' as const }
+  const pair: SnapshotPair = {
+    route: '/',
+    rtl: {
+      ...snapshot('rtl', [
+        el({ key: 'html', tag: 'html', box, style }),
+        el({ key: 'body', tag: 'body', parentKey: 'html', box, style }),
+        el({
+          key: 'p',
+          selector: '#p',
+          text: {
+            value: 'Free shipping today',
+            arabic: 0,
+            latin: 17,
+            digits: { arabicIndic: 0, western: 0 },
+          },
+          box,
+        }),
+      ]),
+      lang: 'en',
+    },
+    matches: [],
+    unmatched: { ltr: [], rtl: [] },
+  }
+  const run = (only: string) => {
+    const c = config({ locale: { strategy: 'attribute' } })
+    return runRules(
+      pair,
+      resolveRules(
+        builtinRules.filter((r) => r.meta.id === only),
+        c,
+      ),
+      c,
+    )
+  }
+
+  it('skips untranslated-text, since nothing was translated', () => {
+    const result = run('untranslated-text')
+    expect(result.findings).toEqual([])
+    expect(result.skippedRules).toEqual(['untranslated-text'])
+  })
+
+  it("doesn't ask for an Arabic lang", () => {
+    expect(run('document-direction').findings).toEqual([])
+  })
+})
+
+describe('repeated components', () => {
+  it('merge into one finding with the number of copies', () => {
+    const card = { x: 0, y: 0, w: 100, h: 50 }
+    const pair = layout(
+      [1, 2, 3].map((n) => ({
+        key: `c${n}`,
+        ltr: { ...card, y: n * 60 },
+        rtl: { ...card, y: n * 60 },
+        extra: {
+          selector: `#list > li:nth-of-type(${n}) > span:nth-of-type(1)`,
+          testId: undefined,
+        },
+      })),
+    )
+    const findings = audit(pair, 'not-mirrored')
+    expect(findings).toHaveLength(1)
+    expect(findings[0]?.selector).toBe('#list > li:nth-of-type(1) > span:nth-of-type(1)')
+    expect(findings[0]?.evidence.copies).toBe(3)
+    expect(findings[0]?.message).toMatch(/The same on 2 more copies of this element\.$/)
+  })
+})

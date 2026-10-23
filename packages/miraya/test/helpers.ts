@@ -1,8 +1,13 @@
 import { parseConfig } from '../src/core/config'
 import type { Box, ElementSnap, Snapshot } from '../src/types'
 
+/** A translated app by default; pass `locale: { strategy: 'attribute' }` for layout-only runs. */
 export const config = (input: Record<string, unknown> = {}) =>
-  parseConfig({ baseUrl: 'http://localhost:4000', ...input })
+  parseConfig({
+    baseUrl: 'http://localhost:4000',
+    locale: { strategy: 'path-prefix', ltr: '/en', rtl: '/ar' },
+    ...input,
+  })
 
 let keyCounter = 0
 

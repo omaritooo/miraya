@@ -18,6 +18,27 @@ const SKIP_TAGS = new Set([
   'base',
 ])
 const LEAF_TAGS = new Set(['svg'])
+// Overlays that dev servers and devtools inject: they aren't the app, and they sit at a
+// fixed physical position in both directions.
+const DEV_OVERLAY_TAGS = new Set([
+  'nuxt-devtools-frame',
+  'vite-error-overlay',
+  'vite-plugin-checker-error-overlay',
+  'nextjs-portal',
+  'astro-dev-toolbar',
+])
+const DEV_OVERLAY_IDS = new Set([
+  'vue-tracer-overlay',
+  'nuxt-devtools-container',
+  'nuxt-devtools-anchor',
+  '__vue-devtools-container__',
+  '__nuxt-devtools-container',
+  '__next-build-watcher',
+  '__next-prerender-indicator',
+  'webpack-dev-server-client-overlay',
+  'react-refresh-overlay',
+  'svelte-inspector-host',
+])
 const ARABIC_LETTER = /(?=\p{Script=Arabic})\p{L}/gu
 const LATIN_LETTER = /(?=\p{Script=Latin})\p{L}/gu
 const ARABIC_INDIC_DIGIT = /[\u0660-\u0669\u06F0-\u06F9]/g
@@ -200,7 +221,7 @@ export function collect(options: CollectorOptions): PageCollection {
     if (stats.capped) return
     const tag = el.localName
     if (SKIP_TAGS.has(tag)) return
-    if (tag === 'iframe') {
+    if (tag === 'iframe' || DEV_OVERLAY_TAGS.has(tag) || DEV_OVERLAY_IDS.has(el.id)) {
       stats.skipped++
       return
     }

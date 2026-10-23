@@ -230,3 +230,21 @@ describe('translation files', () => {
     expect(findings[0]?.evidence.translationFile).toMatch(/fixtures\/site\/locales\/ar\.json$/)
   })
 })
+
+describe('pages that crash', () => {
+  it('fail the route with the page error instead of checking an empty page', async () => {
+    const result = await audit({
+      config,
+      routes: ['/crash'],
+      browser,
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-crash-')),
+    })
+    const route = result.routes[0]
+    expect(route?.status).toBe('error')
+    expect(route?.findings).toEqual([])
+    expect(route?.errors[0]?.message).toMatch(
+      /page rendered (nothing|no text), after a page error: .*Missing environment variables/,
+    )
+    expect(exitCode(result)).toBe(2)
+  })
+})

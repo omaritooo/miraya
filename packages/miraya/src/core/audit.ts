@@ -260,6 +260,21 @@ export async function audit(options: AuditOptions): Promise<Report> {
               writeFileSync(file, `${JSON.stringify(r.snapshot, null, 2)}\n`)
             }
           }
+          // A page that threw and drew next to nothing crashed: checking it would report
+          // on an empty document, so the route fails with the page's own error instead.
+          for (const r of [ltr, rtl]) {
+            if (!r) continue
+            const drawn = r.snapshot.elements.filter(
+              (el) => el.tag !== 'html' && el.tag !== 'body' && el.box.w > 0 && el.box.h > 0,
+            )
+            const [first] = r.snapshot.pageErrors ?? []
+            const textless = !drawn.some((el) => el.text?.value?.trim())
+            if (drawn.length === 0 || (first !== undefined && textless)) {
+              throw new Error(
+                `The ${r.snapshot.dir.toUpperCase()} page rendered ${drawn.length === 0 ? 'nothing' : 'no text'}${first ? `, after a page error: ${first}` : ''}. Nothing was checked.`,
+              )
+            }
+          }
           const run = runRules(pair, resolved, config, crops, translations)
 
           const notes = [

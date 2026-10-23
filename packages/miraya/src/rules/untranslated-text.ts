@@ -18,6 +18,7 @@ export default defineRule({
     defaultSeverity: 'warn',
     needs: 'rtl',
     fingerprintKeys: ['textHash'],
+    needsTranslation: true,
     docs: ID,
   },
   options: z.object({ minWords: z.number().int().min(1).default(2) }),
@@ -90,7 +91,7 @@ function where({ status, key, file }: TranslationMatch): string {
     case 'copied':
       return `"${key}" in ${file} still holds the English text.`
     case 'fallback':
-      return `${file} translates "${key}", but the page shows the English: check that the Arabic file loads here.`
+      return `${file} translates "${key}", but the page shows the English: the component may write the text instead of using the key, or the Arabic file doesn't load here.`
     case 'not-found':
       return `It isn't in ${file}, so it's probably written into a component.`
   }

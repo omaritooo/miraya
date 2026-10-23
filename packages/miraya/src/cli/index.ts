@@ -96,10 +96,11 @@ program
   .option('--crawl', 'with the app running, find routes by following its links')
   .option('--base-url <url>', 'where the app runs (default: guessed from the dev script)')
   .option('--force', 'overwrite an existing config file')
+  .option('--print', 'print the config instead of writing it; changes no files')
   .action(async (opts) => {
     const dir = process.cwd()
     const existing = findConfig(dir)
-    if (existing && !opts.force) {
+    if (existing && !opts.force && !opts.print) {
       throw new ConfigError(`${existing} already exists; pass --force to replace it`)
     }
     const detected = detectProject(dir)
@@ -119,6 +120,7 @@ program
       }
       detected.notes.push(`${detected.routes.length} routes found by following links from /.`)
     }
+    if (opts.print) return out(renderConfig(detected))
     const file = join(dir, detected.typescript ? 'miraya.config.ts' : 'miraya.config.mjs')
     writeFileSync(file, renderConfig(detected))
     out(`Wrote ${file}`)

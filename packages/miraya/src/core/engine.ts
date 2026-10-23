@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { rtlWrapper } from '../rules/util'
 import type { CropCache } from './crops'
 import type {
   ElementSnap,
@@ -80,7 +81,7 @@ export function fingerprint(rule: Rule<unknown>, input: FindingInput): string {
 
 function isRtlPage(pair: SnapshotPair) {
   const body = pair.rtl.elements.find((el) => el.tag === 'body')
-  return pair.rtl.dir === 'rtl' || body?.style.direction === 'rtl'
+  return pair.rtl.dir === 'rtl' || body?.style.direction === 'rtl' || !!rtlWrapper(pair.rtl)
 }
 
 export type RuleRun = { findings: Finding[]; skippedRules: string[]; errors: RouteError[] }
@@ -108,10 +109,15 @@ export function runRules(
       Number(a.rule.meta.id === 'document-direction'),
   )
   const rtlPage = isRtlPage(pair)
+  const layoutOnly = typeof config.locale === 'object' && config.locale.strategy === 'attribute'
 
   for (const { rule, severity, options } of ordered) {
     const { meta } = rule
-    if ((meta.needs === 'pair' && !pair.ltr) || (meta.id !== 'document-direction' && !rtlPage)) {
+    if (
+      (meta.needs === 'pair' && !pair.ltr) ||
+      (meta.id !== 'document-direction' && !rtlPage) ||
+      (meta.needsTranslation && layoutOnly)
+    ) {
       skippedRules.push(meta.id)
       continue
     }
@@ -163,7 +169,33 @@ export function runRules(
       a.rule.localeCompare(b.rule) ||
       a.selector.localeCompare(b.selector),
   )
-  return { findings, skippedRules, errors }
+  return { findings: mergeRepeats(findings), skippedRules, errors }
+}
+
+/**
+ * One mistake in a repeated component (a card, a list item) shows up on every copy. Findings
+ * with the same rule and message whose selectors differ only in their positions become one,
+ * on the first copy, with the number of copies.
+ */
+function mergeRepeats(findings: Finding[]): Finding[] {
+  const shape = (f: Finding) =>
+    `${f.rule}\u0000${f.message}\u0000${f.selector.replace(/:nth-of-type\(\d+\)/g, ':nth-of-type(n)')}`
+  const groups = new Map<string, Finding[]>()
+  for (const f of findings) {
+    const key = shape(f)
+    const group = groups.get(key)
+    if (group) group.push(f)
+    else groups.set(key, [f])
+  }
+  return [...groups.values()].map(([first, ...rest]) => {
+    const f = first as Finding
+    if (rest.length === 0) return f
+    return {
+      ...f,
+      message: `${f.message} The same on ${rest.length} more ${rest.length === 1 ? 'copy' : 'copies'} of this element.`,
+      evidence: { ...f.evidence, copies: rest.length + 1 },
+    }
+  })
 }
 
 export const zodIssuePath = (error: z.ZodError) =>

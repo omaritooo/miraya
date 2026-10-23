@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Crash</title>
+  </head>
+  <body>
+    <!-- An app that throws before mounting, like a missing environment variable. -->
+    <div id="app"></div>
+    <script>
+      throw new Error('Missing environment variables')
+    </script>
+  </body>
+</html>

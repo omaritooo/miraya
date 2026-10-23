@@ -11,7 +11,9 @@ const FREEZE_CSS = `*, *::before, *::after {
   scroll-behavior: auto !important;
 }`
 const QUIET_MS = 500
-const MAX_RENDER_ATTEMPTS = 3
+// Vite and Nuxt dev servers reload once per batch of newly optimised dependencies, and a
+// first visit can bring a few batches.
+const MAX_RENDER_ATTEMPTS = 6
 const STABLE_MS = 300
 const NAVIGATION_ERROR =
   /Execution context was destroyed|Cannot find context with specified id|because of a navigation/
@@ -214,9 +216,12 @@ export function checkRedirect(
   requested: string | undefined,
   finalUrl: string,
   config: ResolvedConfig,
+  route?: string,
 ) {
   const pattern = config.auth.loginUrlPattern
-  if (pattern && finalUrl.includes(pattern) && !requested?.includes(pattern)) {
+  // A custom switch opens the page itself, so the route is all that's known of the request.
+  const asked = requested ?? route
+  if (pattern && finalUrl.includes(pattern) && !asked?.includes(pattern)) {
     throw new RedirectError(
       `Redirected to the login page (${finalUrl}); is the storageState expired?`,
       finalUrl,
@@ -257,7 +262,7 @@ export async function renderRoute(
   try {
     const requested = await open(page, route, dir, config)
     let finalUrl = page.url()
-    checkRedirect(requested, finalUrl, config)
+    checkRedirect(requested, finalUrl, config, route)
 
     // A page can reload under us: a dev server reacting to the files this audit writes,
     // or a script redirecting after load. Count main-frame navigations, and redo the
@@ -326,13 +331,13 @@ export async function renderRoute(
       if (!collected) {
         if (attempt >= MAX_RENDER_ATTEMPTS) {
           throw new Error(
-            `The page kept reloading during the audit (${attempt} attempts). If a dev server is serving it, stop it from watching the output folder.`,
+            `The page kept reloading during the audit (${attempt} attempts). Dev servers reload while they optimise dependencies on a first visit, so running again usually works; a production build avoids it. Also check that the dev server doesn't watch Miraya's output folder.`,
           )
         }
         notes.push(`${dir}: the page reloaded during the audit, so it was rendered again`)
         await waitForStableDocument()
         finalUrl = page.url()
-        checkRedirect(requested, finalUrl, config)
+        checkRedirect(requested, finalUrl, config, route)
       }
     }
 
