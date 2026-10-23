@@ -1,4 +1,4 @@
-import type { CDPSession, Page } from '@playwright/test'
+import type { CDPSession, Page } from 'playwright'
 import { COLLECTOR_SOURCE } from './generated/source'
 import type { CollectorOptions, PageCollection } from './protocol'
 

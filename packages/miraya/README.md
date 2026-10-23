@@ -14,21 +14,24 @@ Miraya opens each page twice in a real browser, once in English (LTR) and once i
 ## Install
 
 ```sh
-npm install --save-dev @miraya/cli @playwright/test
-npx playwright install chromium
+npm install --save-dev @miraya/cli
 ```
 
-Node 20 or later. Miraya drives Chromium through Playwright, which you install alongside it. The package is `@miraya/cli`; the command it installs is `miraya`.
+Node 20 or later. The package is `@miraya/cli`; the command it installs is `miraya`. Miraya drives Chromium through Playwright, which comes with it; the first run downloads Chromium if it isn't there yet.
 
 ## Quick start
 
 In your project, run:
 
 ```sh
-npx miraya init
+npx miraya
 ```
 
-It reads your framework (Next.js, Nuxt, SvelteKit, Astro or Vite), your i18n setup and your page files, and writes `miraya.config.ts` with each guess explained in a comment. Pages with parameters, like `/products/[id]`, are left commented out for you to fill in with a real page. If your routes don't come from files, start the app and run `npx miraya init --crawl` to find them by following links.
+The first time, it reads your framework (Next.js, Nuxt, SvelteKit, Astro or Vite), your i18n setup and your page files, shows what it found, and asks to write `miraya.config.ts`. Then, and on every run after that, it starts your app with its dev script, audits each route, stops the app, and opens the report.
+
+You get a summary in the terminal, `.miraya/report.json`, and `.miraya/report.html`, with each finding outlined on both screenshots.
+
+To write the config without auditing, run `npx miraya init` (`--print` shows it without writing). Pages with parameters, like `/products/[id]`, are left commented out for you to fill in with a real page. If your routes don't come from files, `npx miraya init --crawl` finds them by following links.
 
 Or write the config yourself:
 
@@ -37,19 +40,13 @@ import { defineConfig } from '@miraya/cli'
 
 export default defineConfig({
   baseUrl: 'http://localhost:3000',
+  // Started for the run when nothing answers at baseUrl. Leave it out to start the app yourself.
+  server: { command: 'npm run dev' },
   routes: ['/', '/pricing', '/account/settings'],
   // How your app switches to Arabic. Here: /en/... and /ar/...
   locale: { strategy: 'path-prefix', ltr: '/en', rtl: '/ar' },
 })
 ```
-
-Start your app, then:
-
-```sh
-npx miraya audit
-```
-
-You get a summary in the terminal, `.miraya/report.json`, and `.miraya/report.html`. Open the HTML report to see each finding outlined on both screenshots.
 
 ## How your app switches direction
 
@@ -71,31 +68,33 @@ Set `locale` to match your app:
 
 Everything except `baseUrl` is optional.
 
-| Option                    | Default                     | What it does                                                                                                                                                                            |
-| ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `baseUrl`                 |                             | Where your app is running.                                                                                                                                                              |
-| `routes`                  |                             | Paths to audit, each starting with `/`.                                                                                                                                                 |
-| `crawl`                   |                             | `{ start, maxDepth, maxRoutes, include, exclude }`: find routes by following links. Use with `--crawl`.                                                                                 |
-| `locale`                  | `{ strategy: 'attribute' }` | How to switch direction. See above.                                                                                                                                                     |
-| `auth.storageState`       |                             | A saved session, for pages behind a login. `npx miraya login` makes one; see [Pages behind a login](#pages-behind-a-login).                                                             |
-| `auth.loginUrlPattern`    |                             | If a route redirects here, it's reported as failed instead of auditing the login page.                                                                                                  |
-| `viewport`                | `{ w: 1280, h: 800 }`       | Browser size.                                                                                                                                                                           |
-| `maxPageHeight`           | `15000`                     | Screenshots stop here.                                                                                                                                                                  |
-| `scrollToLoad`            | `false`                     | Scroll the page first, for content that loads on scroll.                                                                                                                                |
-| `pairing.testIdAttribute` | `'data-testid'`             | Elements with the same test id are paired first. Add test ids to anything Miraya pairs wrongly.                                                                                         |
-| `fonts.arabic`            | `[]`                        | Font families you ship for Arabic. Anything else drawing Arabic is a fallback.                                                                                                          |
-| `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                           |
-| `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files). |
-| `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                   |
-| `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                               |
-| `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                            |
-| `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                        |
+| Option                    | Default                     | What it does                                                                                                                                                                                                        |
+| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUrl`                 |                             | Where your app is running.                                                                                                                                                                                          |
+| `server`                  |                             | `{ command, timeoutMs }`: how to start the app. Runs `command` when nothing answers at `baseUrl`, waits up to `timeoutMs` (120000) for it, and stops it at the end. An app that's already running is used as it is. |
+| `routes`                  |                             | Paths to audit, each starting with `/`.                                                                                                                                                                             |
+| `crawl`                   |                             | `{ start, maxDepth, maxRoutes, include, exclude }`: find routes by following links. Use with `--crawl`.                                                                                                             |
+| `locale`                  | `{ strategy: 'attribute' }` | How to switch direction. See above.                                                                                                                                                                                 |
+| `auth.storageState`       |                             | A saved session, for pages behind a login. `npx miraya login` makes one; see [Pages behind a login](#pages-behind-a-login).                                                                                         |
+| `auth.loginUrlPattern`    |                             | If a route redirects here, it's reported as failed instead of auditing the login page.                                                                                                                              |
+| `viewport`                | `{ w: 1280, h: 800 }`       | Browser size.                                                                                                                                                                                                       |
+| `maxPageHeight`           | `15000`                     | Screenshots stop here.                                                                                                                                                                                              |
+| `scrollToLoad`            | `false`                     | Scroll the page first, for content that loads on scroll.                                                                                                                                                            |
+| `pairing.testIdAttribute` | `'data-testid'`             | Elements with the same test id are paired first. Add test ids to anything Miraya pairs wrongly.                                                                                                                     |
+| `fonts.arabic`            | `[]`                        | Font families you ship for Arabic. Anything else drawing Arabic is a fallback.                                                                                                                                      |
+| `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                                                       |
+| `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files).                             |
+| `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                                               |
+| `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                                                           |
+| `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                                                        |
+| `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                                                    |
 
 The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gives you types and autocomplete. JSON Schemas for the report and the baseline ship in `@miraya/cli/schema/`.
 
 ## Commands
 
 ```sh
+npx miraya                           # audit; writes a config first if there's none
 npx miraya init                      # write a config for this project
 npx miraya init --print              # show the config it would write, change nothing
 npx miraya login                     # sign in by hand and save the session
@@ -108,7 +107,7 @@ npx miraya explain 3b390ba0          # the measurements behind one finding
 npx miraya rules                     # list the rules
 ```
 
-`audit` exits with `0` when there are no new errors, `1` when there are, and `2` when a page couldn't be audited (pass `--allow-errors` to report those without failing). Run `npx miraya audit --help` for every option.
+`audit` exits with `0` when there are no new errors, `1` when there are, and `2` when a page couldn't be audited (pass `--allow-errors` to report those without failing). In a terminal, `audit` opens the HTML report when it ends; `--no-open` stops that, and CI never opens it. Run `npx miraya audit --help` for every option.
 
 ## Pages behind a login
 
@@ -189,7 +188,7 @@ test('checkout has no RTL bugs', async ({ page }) => {
 
 Copy [`examples/github-action/miraya.yml`](https://github.com/omaritooo/miraya/blob/main/examples/github-action/miraya.yml) into `.github/workflows/`. On GitHub Actions, findings appear as annotations on the pull request and in the job summary, and the HTML report is uploaded as an artifact.
 
-Run it in the Playwright container image, as the example does. It pins the system fonts, so screenshots and baselines stay the same from run to run.
+The example serves the production build itself, so the `server` command in your config isn't run: an app that's already answering at `baseUrl` is used as it is. Run it in the Playwright container image, as the example does. It pins the system fonts, so screenshots and baselines stay the same from run to run.
 
 ## Rules
 
@@ -285,7 +284,7 @@ A phone number, price, email, URL or English phrase inside Arabic text can be di
 ## Using it from code
 
 ```ts
-import { chromium } from '@playwright/test'
+import { chromium } from 'playwright'
 import { audit, parseConfig, writeHtmlReport } from '@miraya/cli'
 
 const config = parseConfig({ baseUrl: 'http://localhost:3000', routes: ['/'] })

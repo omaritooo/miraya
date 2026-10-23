@@ -48,6 +48,16 @@ export type RuleSetting = z.infer<typeof RuleSettingSchema>
 // so the inner defaults would never be applied.
 export const ConfigSchema = z.object({
   baseUrl: z.url(),
+  /**
+   * Starts the app for the run: the CLI runs `command`, waits until baseUrl answers, and
+   * stops it at the end. When something already answers at baseUrl, that's used instead.
+   */
+  server: z
+    .object({
+      command: z.string(),
+      timeoutMs: z.number().int().min(1000).default(120_000),
+    })
+    .optional(),
   routes: z.array(z.string().startsWith('/')).optional(),
   crawl: z
     .object({

@@ -14,6 +14,15 @@ function project(files: Record<string, unknown>) {
   return dir
 }
 
+/** Evaluates the object literal the way a config file would. */
+function renderedInput(text: string) {
+  const body = text.slice(
+    text.indexOf('defineConfig({') + 'defineConfig('.length,
+    text.lastIndexOf(')'),
+  )
+  return new Function(`return (${body})`)() as Record<string, unknown>
+}
+
 describe('detectProject', () => {
   it('reads a next-intl app: routes under [locale], path prefixes, translation files', () => {
     const dir = project({
@@ -38,7 +47,22 @@ describe('detectProject', () => {
       dynamicRoutes: ['/products/[id]'],
       locales: { ltr: './messages/en.json', rtl: './messages/ar.json' },
       typescript: true,
+      server: { command: 'npm run dev' },
     })
+  })
+
+  it('starts the app with the package manager its lockfile names', () => {
+    const dir = project({
+      'package.json': { scripts: { start: 'vite' }, devDependencies: { vite: '7' } },
+      'pnpm-lock.yaml': '',
+    })
+    const d = detectProject(dir)
+    expect(d.server).toEqual({ command: 'pnpm run start' })
+    expect(parseConfig(renderedInput(renderConfig(d))).server?.command).toBe('pnpm run start')
+  })
+
+  it('leaves out the server when there is no script to start the app', () => {
+    expect(detectProject(project({ 'package.json': {} })).server).toBeUndefined()
   })
 
   it('reads a Nuxt app with a no_prefix cookie and folders of translations', () => {
@@ -116,12 +140,7 @@ describe('renderConfig', () => {
     expect(text).toContain("import { defineConfig } from '@miraya/cli'")
     expect(text).toContain('// - next-intl: the locale is in the path.')
     expect(text).toContain("    // '/products/[id]',")
-    // Evaluate the object literal the way a config file would, then validate it.
-    const body = text.slice(
-      text.indexOf('defineConfig({') + 'defineConfig('.length,
-      text.lastIndexOf(')'),
-    )
-    const input = new Function(`return (${body})`)() as Record<string, unknown>
+    const input = renderedInput(text)
     expect(parseConfig(input).routes).toEqual(["/it's"])
     expect(input.locales).toEqual({ ltr: './messages/en.json', rtl: './messages/ar.json' })
   })

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
+import type { Browser, BrowserContext, Page } from 'playwright'
 import { collectPage, DEFAULT_GENERATED_ID_PATTERNS, type PageCollection } from '../collector'
 import type { Dir, ResolvedConfig, Snapshot } from '../types'
 

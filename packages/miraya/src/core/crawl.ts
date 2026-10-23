@@ -1,4 +1,4 @@
-import type { Browser } from '@playwright/test'
+import type { Browser } from 'playwright'
 import picomatch from 'picomatch'
 import type { ResolvedConfig } from '../types'
 import { ConfigError } from './engine'

@@ -1,10 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import type { ConfigInput } from '../types'
 
 /** What `miraya init` found in a project, and why it chose each value. */
 export type Detected = {
   baseUrl: string
+  /** The command that starts the app, from the package scripts. */
+  server?: { command: string }
   locale: NonNullable<ConfigInput['locale']>
   routes: string[]
   /** Routes with parameters, like /products/[id]: written commented out, to fill in. */
@@ -192,6 +194,23 @@ function staticLocaleDirs(dir: string) {
   return undefined
 }
 
+const LOCKFILES: [string, string][] = [
+  ['pnpm-lock.yaml', 'pnpm'],
+  ['yarn.lock', 'yarn'],
+  ['bun.lock', 'bun'],
+  ['bun.lockb', 'bun'],
+  ['package-lock.json', 'npm'],
+]
+
+/** The package manager, from the nearest lockfile here or in a parent (a monorepo root). */
+function packageManager(dir: string): string {
+  for (let at = dir; ; at = dirname(at)) {
+    const hit = LOCKFILES.find(([file]) => existsSync(join(at, file)))
+    if (hit) return hit[1]
+    if (dirname(at) === at) return 'npm'
+  }
+}
+
 /** Reads a project and guesses a config. Reads files only; never runs the app. */
 export function detectProject(dir: string): Detected {
   const notes: string[] = []
@@ -205,7 +224,8 @@ export function detectProject(dir: string): Detected {
   notes.push(framework ? `Framework: ${framework}.` : 'No framework recognised.')
 
   const scripts = pkg.scripts ?? {}
-  const script = scripts.dev ?? scripts.start ?? scripts.serve ?? scripts.preview ?? ''
+  const scriptName = (['dev', 'start', 'serve', 'preview'] as const).find((n) => scripts[n])
+  const script = scriptName ? (scripts[scriptName] as string) : ''
   const port =
     Number(/(?:--port|-p)[\s=](\d+)/.exec(script)?.[1]) ||
     (framework ? DEFAULT_PORT[framework] : 3000)
@@ -213,6 +233,13 @@ export function detectProject(dir: string): Detected {
     /(?:--port|-p)[\s=]\d+/.test(script)
       ? `Port ${port}, from the package scripts.`
       : `Port ${port}, the ${framework ?? 'usual'} default. Change baseUrl if your app runs elsewhere.`,
+  )
+
+  const server = scriptName ? { command: `${packageManager(dir)} run ${scriptName}` } : undefined
+  notes.push(
+    server
+      ? `Starts the app with \`${server.command}\` when it isn't already running.`
+      : 'No dev script found: start the app yourself before running miraya.',
   )
 
   const found = localesIn(dir)
@@ -280,7 +307,7 @@ export function detectProject(dir: string): Detected {
   let kept = routes.length ? routes : ['/']
   if (!routes.length)
     notes.push(
-      'No page files found: starting with `/`. Run `miraya init --crawl` with the app running to find routes by following links.',
+      'No page files found: starting with `/`. Run `miraya init --crawl` to find routes by following links.',
     )
   else
     notes.push(
@@ -293,6 +320,7 @@ export function detectProject(dir: string): Detected {
 
   return {
     baseUrl: `http://localhost:${port}`,
+    ...(server ? { server } : {}),
     locale,
     routes: kept,
     dynamicRoutes: dynamic,
@@ -325,6 +353,7 @@ export function renderConfig(d: Detected): string {
     '// Every option: https://github.com/omaritooo/miraya/tree/main/packages/miraya#configuration',
     'export default defineConfig({',
     `  baseUrl: ${quote(d.baseUrl)},`,
+    ...(d.server ? [`  server: ${literal(d.server)},`] : []),
     `  locale: ${literal(d.locale)},`,
     '  routes: [',
     ...d.routes.map((r) => `    ${quote(r)},`),

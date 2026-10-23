@@ -80,6 +80,9 @@ importers:
       pixelmatch:
         specifier: ^8.0.0
         version: 8.0.0
+      playwright:
+        specifier: ^1.63.0
+        version: 1.63.0
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0

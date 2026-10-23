@@ -1,7 +1,8 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
-import { chromium } from '@playwright/test'
+import { pathToFileURL } from 'node:url'
+import type { Browser } from 'playwright'
 import { Command, Option } from 'commander'
 import pkg from '../../package.json'
 import {
@@ -18,8 +19,10 @@ import {
   readConfigFile,
   renderConfig,
   resolveRules,
+  type Detected,
   routeSlug,
   signIn,
+  startServer,
   updateBaseline,
   writeBaseline,
   writeGithubOutput,
@@ -28,21 +31,74 @@ import {
   writeSession,
 } from '../core'
 import { ReportSchema, type Report, type ResolvedConfig } from '../types'
+import { interactive, launch, openFile } from './browser'
 
 type CommonOptions = { config?: string; baseUrl?: string }
+type Loaded = { config: ResolvedConfig; dir: string }
 
-async function loadCliConfig(opts: CommonOptions): Promise<ResolvedConfig> {
+async function loadCliConfig(opts: CommonOptions): Promise<Loaded> {
   const file = opts.config ?? findConfig()
   if (!file) {
     throw new ConfigError(
-      'No config file: create miraya.config.ts (see the README), or pass --config <path>',
+      'No config file: run `npx miraya init` to write one, or pass --config <path>',
     )
   }
   const input = await readConfigFile(file)
-  return parseConfig(
+  const config = parseConfig(
     { ...input, ...(opts.baseUrl ? { baseUrl: opts.baseUrl } : {}) },
     resolve(file),
   )
+  return { config, dir: dirname(resolve(file)) }
+}
+
+/**
+ * Starts the app if the config says how and it isn't running, launches Chromium, runs
+ * `work`, and shuts both down again, on Ctrl-C too.
+ */
+async function withApp<T>(
+  { config, dir }: Loaded,
+  options: { headless?: boolean },
+  work: (browser: Browser) => Promise<T>,
+): Promise<T> {
+  if (config.server) err(`Waiting for ${config.baseUrl}…`)
+  const server = await startServer(config, dir)
+  if (server.started) err(`Started the app with \`${config.server?.command}\``)
+  const interrupt = () => void server.stop().finally(() => process.exit(130))
+  process.once('SIGINT', interrupt)
+  try {
+    const browser = await launch(options)
+    try {
+      return await work(browser)
+    } finally {
+      await browser.close()
+    }
+  } finally {
+    process.off('SIGINT', interrupt)
+    await server.stop()
+  }
+}
+
+/** Writes the config `init` detected, and keeps .miraya/ out of git. Returns the file. */
+function writeInit(dir: string, detected: Detected): string {
+  const file = join(dir, detected.typescript ? 'miraya.config.ts' : 'miraya.config.mjs')
+  writeFileSync(file, renderConfig(detected))
+  out(`Wrote ${relative(process.cwd(), file) || file}`)
+  const gitignore = join(dir, '.gitignore')
+  const ignored = existsSync(gitignore) ? readFileSync(gitignore, 'utf8') : ''
+  if (!/^\/?\.miraya\/?$/m.test(ignored)) {
+    appendFileSync(gitignore, `${ignored && !ignored.endsWith('\n') ? '\n' : ''}.miraya/\n`)
+    out('Added .miraya/ to .gitignore')
+  }
+  return file
+}
+
+async function ask(question: string): Promise<string> {
+  const terminal = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    return await new Promise((done) => terminal.question(question, done))
+  } finally {
+    terminal.close()
+  }
 }
 
 const out = (line = ''): void => {
@@ -76,7 +132,7 @@ function printSummary(report: Report) {
 async function routesFor(
   opts: { route?: string[]; crawl?: boolean },
   config: ResolvedConfig,
-  browser: import('@playwright/test').Browser,
+  browser: Browser,
 ) {
   if (opts.route?.length) return opts.route
   if (opts.crawl) {
@@ -96,7 +152,7 @@ const program = new Command()
 program
   .command('init')
   .description('Write a miraya.config for this project, from its framework, i18n setup and pages.')
-  .option('--crawl', 'with the app running, find routes by following its links')
+  .option('--crawl', 'find routes by following links in the running app')
   .option('--base-url <url>', 'where the app runs (default: guessed from the dev script)')
   .option('--force', 'overwrite an existing config file')
   .option('--print', 'print the config instead of writing it; changes no files')
@@ -111,31 +167,20 @@ program
     if (opts.crawl) {
       const config = parseConfig({
         baseUrl: detected.baseUrl,
+        ...(detected.server ? { server: detected.server } : {}),
         locale: detected.locale,
         crawl: {},
       })
-      const browser = await chromium.launch()
-      try {
-        detected.routes = await crawl(browser, config)
-        detected.notes = detected.notes.filter((n) => !n.startsWith('No page files found'))
-      } finally {
-        await browser.close()
-      }
-      detected.notes.push(`${detected.routes.length} routes found by following links from /.`)
+      detected.routes = await withApp({ config, dir }, {}, (browser) => crawl(browser, config))
+      detected.notes = detected.notes.filter((n) => !n.startsWith('No page files found'))
+      detected.notes.push(
+        `${detected.routes.length} ${detected.routes.length === 1 ? 'route' : 'routes'} found by following links from /.`,
+      )
     }
     if (opts.print) return out(renderConfig(detected))
-    const file = join(dir, detected.typescript ? 'miraya.config.ts' : 'miraya.config.mjs')
-    writeFileSync(file, renderConfig(detected))
-    out(`Wrote ${file}`)
+    writeInit(dir, detected)
     for (const note of detected.notes) out(`  ${note}`)
-
-    const gitignore = join(dir, '.gitignore')
-    const ignored = existsSync(gitignore) ? readFileSync(gitignore, 'utf8') : ''
-    if (!/^\/?\.miraya\/?$/m.test(ignored)) {
-      appendFileSync(gitignore, `${ignored && !ignored.endsWith('\n') ? '\n' : ''}.miraya/\n`)
-      out('Added .miraya/ to .gitignore')
-    }
-    out('\nStart your app, then run: npx miraya audit')
+    out('\nNext: npx miraya')
   })
 
 program
@@ -151,16 +196,18 @@ program
     'where to save the session (default: auth.storageState, or .miraya/auth.json)',
   )
   .action(async (route: string | undefined, opts) => {
-    const config = await loadCliConfig(opts)
+    const loaded = await loadCliConfig(opts)
+    const { config } = loaded
     const file = opts.out ?? config.auth.storageState ?? '.miraya/auth.json'
     const start = route ?? config.auth.loginUrlPattern ?? '/'
-    out(`Opening ${new URL(start, config.baseUrl).href}`)
-    out('Sign in in the browser window, then press Enter here (or close the window).')
     const terminal = createInterface({ input: process.stdin })
     const entered = new Promise((done) => terminal.once('line', done))
-    const browser = await chromium.launch({ headless: false })
     try {
-      const state = await signIn({ browser, config, route: start, done: entered })
+      const state = await withApp(loaded, { headless: false }, (browser) => {
+        out(`Opening ${new URL(start, config.baseUrl).href}`)
+        out('Sign in in the browser window, then press Enter here (or close the window).')
+        return signIn({ browser, config, route: start, done: entered })
+      })
       const saved = writeSession(file, state)
       out(
         `Saved the session to ${relative(process.cwd(), saved) || saved}: ${state.cookies.length} cookies, localStorage for ${state.origins.length} ${state.origins.length === 1 ? 'origin' : 'origins'}.`,
@@ -173,7 +220,6 @@ program
       }
     } finally {
       terminal.close()
-      await browser.close()
     }
   })
 
@@ -194,44 +240,61 @@ program
   .option('--keep-artifacts', 'keep PNG screenshots and snapshot JSON for every route')
   .option('--allow-errors', "route errors don't force exit code 2")
   .option('--headed', 'show the browser')
-  .action(async (opts) => {
-    const config = await loadCliConfig(opts)
-    const browser = await chromium.launch({ headless: !opts.headed })
-    let report: Report
-    try {
-      report = await audit({
-        config,
-        routes: await routesFor(opts, config, browser),
-        outDir: opts.out,
-        browser,
-        rtlOnly: !!opts.rtlOnly,
-        keepArtifacts: !!opts.keepArtifacts,
-        ...(opts.rule ? { only: opts.rule } : {}),
-        ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
-      })
-    } finally {
-      await browser.close()
-    }
-    const formats = new Set(
-      String(opts.format)
-        .split(',')
-        .map((f) => f.trim()),
+  .option('--no-open', "don't open the HTML report when the audit ends")
+  .action((opts) => runAudit(opts))
+
+type AuditCliOptions = CommonOptions & {
+  route?: string[]
+  crawl?: boolean
+  out: string
+  format: string
+  rule?: string[]
+  rtlOnly?: boolean
+  concurrency?: number
+  keepArtifacts?: boolean
+  allowErrors?: boolean
+  headed?: boolean
+  open?: boolean
+}
+
+const AUDIT_DEFAULTS = { out: '.miraya', format: 'json,html', open: true }
+
+async function runAudit(opts: AuditCliOptions) {
+  const loaded = await loadCliConfig(opts)
+  const { config } = loaded
+  const report = await withApp(loaded, { headless: !opts.headed }, async (browser) =>
+    audit({
+      config,
+      routes: await routesFor(opts, config, browser),
+      outDir: opts.out,
+      browser,
+      rtlOnly: !!opts.rtlOnly,
+      keepArtifacts: !!opts.keepArtifacts,
+      ...(opts.rule ? { only: opts.rule } : {}),
+      ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
+    }),
+  )
+  const formats = new Set(
+    String(opts.format)
+      .split(',')
+      .map((f) => f.trim()),
+  )
+  if (process.env.GITHUB_ACTIONS === 'true') formats.add('github')
+  const json = writeReport(report, opts.out)
+  printSummary(report)
+  out(`Report: ${json}`)
+  if (formats.has('html')) {
+    const html = writeHtmlReport(report, opts.out, {
+      maxInlineBytes: config.report.maxInlineBytes,
+    })
+    out(
+      `        ${pathToFileURL(html.file).href}${html.inlined ? '' : ' (screenshots referenced, not inlined: keep the routes/ folder with it)'}`,
     )
-    if (process.env.GITHUB_ACTIONS === 'true') formats.add('github')
-    const json = writeReport(report, opts.out)
-    printSummary(report)
-    out(`Report: ${json}`)
-    if (formats.has('html')) {
-      const html = writeHtmlReport(report, opts.out, {
-        maxInlineBytes: config.report.maxInlineBytes,
-      })
-      out(
-        `        ${html.file}${html.inlined ? '' : ' (screenshots referenced, not inlined: keep the routes/ folder with it)'}`,
-      )
-    }
-    if (formats.has('github')) writeGithubOutput(report)
-    process.exitCode = exitCode(report, { allowErrors: !!opts.allowErrors })
-  })
+    if (opts.open !== false && interactive()) openFile(resolve(html.file))
+  }
+  if (formats.has('github')) writeGithubOutput(report)
+  process.exitCode = exitCode(report, { allowErrors: !!opts.allowErrors })
+}
 
 const baseline = program
   .command('baseline')
@@ -244,24 +307,21 @@ baseline
   .option('--base-url <url>', 'override the config baseUrl')
   .option('-o, --out <dir>', 'output folder for screenshots', '.miraya')
   .action(async (opts) => {
-    const config = await loadCliConfig(opts)
+    const loaded = await loadCliConfig(opts)
+    const { config } = loaded
     if (config.baseline === false)
       throw new ConfigError('Baselines are switched off in the config (baseline: false)')
     const path = resolve(config.baseline)
     const existing = readBaseline(path)
-    const browser = await chromium.launch()
-    let report: Report
-    try {
-      report = await audit({
+    const report = await withApp(loaded, {}, async (browser) =>
+      audit({
         config,
         routes: await routesFor(opts, config, browser),
         outDir: opts.out,
         browser,
         baseline: false,
-      })
-    } finally {
-      await browser.close()
-    }
+      }),
+    )
     const failed = report.routes.filter((r) => r.status === 'error')
     if (failed.length) {
       for (const r of failed)
@@ -344,6 +404,28 @@ program
       )
     }
   })
+
+// Plain `miraya`: audit, writing a config first if there isn't one.
+program.action(async () => {
+  const dir = process.cwd()
+  if (!findConfig(dir)) {
+    if (!interactive()) {
+      throw new ConfigError(
+        'No config file: run `npx miraya init` to write one, then `npx miraya audit`',
+      )
+    }
+    const detected = detectProject(dir)
+    out('No miraya config here yet. From this project:')
+    for (const note of detected.notes) out(`  ${note}`)
+    out(`  Routes: ${detected.routes.join(', ')}`)
+    const answer = await ask('\nWrite the config and audit the app? [Y/n] ')
+    if (/^n/i.test(answer.trim()))
+      return out('Nothing written. Run `npx miraya init --print` to see the config.')
+    writeInit(dir, detected)
+    out('')
+  }
+  await runAudit(AUDIT_DEFAULTS)
+})
 
 program.parseAsync().catch((error: unknown) => {
   err(error instanceof Error ? error.message : String(error))

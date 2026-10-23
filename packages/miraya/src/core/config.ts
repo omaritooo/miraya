@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { createJiti } from 'jiti'
 import { ConfigSchema, type ConfigInput, type ResolvedConfig } from '../types'
@@ -27,13 +28,25 @@ export function findConfig(cwd = process.cwd()): string | undefined {
   return CONFIG_FILES.map((f) => resolve(cwd, f)).find((f) => existsSync(f))
 }
 
+/**
+ * The running copy of this package, for configs that import `@miraya/cli`: it loads even
+ * where the project hasn't installed it, as with `npx @miraya/cli`.
+ */
+function self(): Record<string, string> {
+  try {
+    return { '@miraya/cli': createRequire(import.meta.url).resolve('@miraya/cli') }
+  } catch {
+    return {}
+  }
+}
+
 /** Reads a config file's default export without validating it. TypeScript works without a build step, via jiti. */
 export async function readConfigFile(path: string): Promise<Partial<ConfigInput>> {
   const file = resolve(path)
   if (!existsSync(file)) throw new ConfigError(`Config file not found: ${file}`)
   let loaded: unknown
   try {
-    loaded = await createJiti(file).import(file, { default: true })
+    loaded = await createJiti(file, { alias: self() }).import(file, { default: true })
   } catch (error) {
     throw new ConfigError(
       `Couldn't load ${file}: ${error instanceof Error ? error.message : String(error)}`,

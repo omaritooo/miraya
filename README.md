@@ -10,9 +10,8 @@ Miraya opens each page in English and in Arabic in a real browser, pairs up the 
 </picture>
 
 ```sh
-npm install --save-dev @miraya/cli @playwright/test
-npx playwright install chromium
-npx miraya audit
+npm install --save-dev @miraya/cli
+npx miraya
 ```
 
 ## Packages

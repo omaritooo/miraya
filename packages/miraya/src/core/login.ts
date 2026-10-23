@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
+import type { Browser, BrowserContext, Page } from 'playwright'
 import type { ResolvedConfig } from '../types'
 
 type StorageState = Awaited<ReturnType<BrowserContext['storageState']>>
