@@ -70,6 +70,8 @@ export type Filters = {
   rule?: string
   /** One of New, Known or All. New is the default: it's what fails the run. */
   status: Status
+  /** A site-wide SEO table instead of one page. */
+  site?: 'titles' | 'links'
 }
 
 const list = <T extends string>(value: string | null, allowed: readonly T[]): T[] =>
@@ -87,6 +89,9 @@ export function readHash(hash: string): Filters {
     ...(params.get('rule') ? { rule: params.get('rule') as string } : {}),
     severity: list(params.get('severity'), SEVERITIES),
     status: status && STATUSES.includes(status) ? status : 'new',
+    ...(params.get('site') === 'titles' || params.get('site') === 'links'
+      ? { site: params.get('site') as 'titles' | 'links' }
+      : {}),
   }
 }
 
@@ -98,6 +103,7 @@ export function writeHash(filters: Filters): string {
   if (filters.severity.length) params.set('severity', filters.severity.join(','))
   if (filters.rule) params.set('rule', filters.rule)
   if (filters.status !== 'new') params.set('status', filters.status)
+  if (filters.site) params.set('site', filters.site)
   return `#${params.toString()}`
 }
 

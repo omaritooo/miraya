@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveRules, runRules } from '../src/core/engine'
+import { resolveRules, runRules, runSiteRules } from '../src/core/engine'
 import { builtinRules } from '../src/rules'
 import type { PageHead, SnapshotPair } from '../src/types'
 import { config, snapshot } from './helpers'
@@ -179,5 +179,32 @@ describe('SEO rules', () => {
   it('switch off with checks', () => {
     const c = config({ baseUrl: 'https://bayn.app', checks: ['localization'] })
     expect(resolveRules(builtinRules, c).some((r) => r.rule.meta.area === 'seo')).toBe(false)
+  })
+
+  it('flag pages that share a title or description, across the site', () => {
+    const c = config({ baseUrl: 'https://bayn.app' })
+    const page = (route: string, title: string, arTitle = `${title} ar`) => ({
+      route,
+      head: {
+        ltr: { ...snapshot('ltr', []).head, title, description: `About ${route}` },
+        rtl: { ...snapshot('rtl', []).head, title: arTitle, description: `عن ${route}` },
+      },
+    })
+    const { findings, errors } = runSiteRules(
+      [
+        page('/docs', 'Docs · Bayn', 'المستندات'),
+        page('/docs/api', 'Docs · Bayn', 'المستندات'),
+        page('/pricing', 'Pricing'),
+      ],
+      resolveRules(builtinRules, c),
+      c,
+    )
+    expect(errors).toEqual([])
+    expect(
+      findings.map((f) => `${f.route} ${f.rule} ${f.evidence.check} ${f.evidence.side}`),
+    ).toEqual(['/docs duplicate-title title both', '/docs/api duplicate-title title both'])
+    expect(findings[0]?.message).toBe(
+      "The same title as /docs/api: “Docs · Bayn”. Search results can't tell the pages apart.",
+    )
   })
 })

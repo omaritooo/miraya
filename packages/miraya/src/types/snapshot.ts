@@ -165,6 +165,8 @@ export const PagePerfSchema = z.object({
     }),
   ),
   runs: z.number().int(),
+  /** The page loaded a dev server's hot-reload client, so its numbers don't reflect production. */
+  devServer: z.boolean().optional(),
 })
 export type PagePerf = z.infer<typeof PagePerfSchema>
 

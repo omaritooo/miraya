@@ -17,8 +17,8 @@ export type Issue = {
  * finding about both, so a site-wide template problem isn't counted twice per page.
  */
 export function report<O>(
-  pair: SnapshotPair,
-  ctx: RuleContext<O>,
+  pair: Pick<SnapshotPair, 'route'>,
+  ctx: Pick<RuleContext<O>, 'finding'>,
   rule: string,
   selector: string,
   issues: Partial<Record<Dir, Issue[]>>,

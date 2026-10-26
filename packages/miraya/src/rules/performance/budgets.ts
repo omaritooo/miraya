@@ -16,6 +16,9 @@ export function measured(pair: SnapshotPair): { dir: Dir; perf: PagePerf }[] {
   })
 }
 
+/** A dev server's numbers are for reference: they're reported as info and don't fail the run. */
+export const devSeverity = (perf: PagePerf) => (perf.devServer ? { severity: 'info' as const } : {})
+
 type Metric = {
   id: string
   docs: string
@@ -65,6 +68,7 @@ function budgetRule(metric: Metric) {
           {
             check: 'over',
             message,
+            ...devSeverity(v.perf),
             ...element,
             evidence: { ...evidence, ...element?.evidence },
           },

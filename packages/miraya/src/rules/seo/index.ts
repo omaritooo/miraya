@@ -1,4 +1,5 @@
 import canonical from './canonical'
+import duplicateTitle from './duplicate-title'
 import hreflang from './hreflang'
 import metaDescription from './meta-description'
 import pageTitle from './page-title'
@@ -16,4 +17,5 @@ export const seoRules = [
   singleH1,
   socialPreview,
   structuredData,
+  duplicateTitle,
 ]

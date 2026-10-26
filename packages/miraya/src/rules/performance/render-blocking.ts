@@ -2,7 +2,7 @@ import * as z from 'zod'
 import type { Dir } from '../../types'
 import { report, type Issue } from '../page-findings'
 import { defineRule } from '../util'
-import { kb, measured } from './budgets'
+import { devSeverity, kb, measured } from './budgets'
 
 const file = (url: string) => {
   try {
@@ -35,6 +35,7 @@ export default defineRule({
           check: 'over',
           message: `${blocking.length} ${blocking.length === 1 ? 'file holds' : 'files hold'} up the first paint: ${names.join(', ')}${more}.`,
           evidence: { budget, count: blocking.length },
+          ...devSeverity(perf),
         },
       ]
     }

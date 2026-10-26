@@ -28,6 +28,15 @@ const MAX_RESOURCES = 200
 const QUIET_MS = 1000
 const IDLE_CAP_MS = 10_000
 
+/** Hot-reload clients that only development servers send: Vite, Next.js, webpack, Nuxt. */
+const DEV_CLIENTS = [
+  /\/@vite\/client\b/,
+  /\/@react-refresh\b/,
+  /\/_next\/static\/webpack\//,
+  /webpack-hmr|\.hot-update\.(js|json)\b/,
+  /\/_nuxt\/@vite\//,
+]
+
 const CDP_TYPES: Record<string, ResourceType> = {
   Document: 'document',
   Script: 'script',
@@ -236,7 +245,9 @@ async function loadOnce(
       const wastedBytes = Math.round(file * (1 - shown))
       return wastedBytes >= MIN_WASTED_BYTES ? [{ ...img, bytes: file, wastedBytes }] : []
     })
+    const devServer = list.some((r) => DEV_CLIENTS.some((re) => re.test(r.url)))
     return {
+      ...(devServer ? { devServer } : {}),
       ...(measured.lcp ? { lcp: measured.lcp } : {}),
       ...(measured.fcpMs !== undefined ? { fcpMs: measured.fcpMs } : {}),
       cls: measured.cls,

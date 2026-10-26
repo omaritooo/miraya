@@ -1,7 +1,7 @@
 import type { ZodType } from 'zod'
 import type { ResolvedConfig } from './config'
 import type { Area, Finding, Severity } from './finding'
-import type { Dir, ElementSnap, MatchMethod, SnapshotPair } from './snapshot'
+import type { Dir, ElementSnap, MatchMethod, PageHead, SnapshotPair } from './snapshot'
 import type { Translations } from './translations'
 
 export type RGBAImage = { width: number; height: number; data: Uint8Array }
@@ -47,9 +47,17 @@ export type RuleContext<O> = {
   translations?: Translations
 }
 
+/** One audited page, for rules that compare pages with each other. */
+export type SitePage = { route: string; head: { ltr?: PageHead; rtl: PageHead } }
+
+export type SiteContext<O> = Pick<RuleContext<O>, 'options' | 'config' | 'finding'>
+
 export type Rule<O = unknown> = {
   meta: RuleMeta
   /** Defaults live in the schema. */
   options: ZodType<O>
-  check(pair: SnapshotPair, ctx: RuleContext<O>): Finding[]
+  /** Checks one page in both languages. */
+  check?(pair: SnapshotPair, ctx: RuleContext<O>): Finding[]
+  /** Checks every audited page at once, after they're all done; for problems between pages. */
+  checkSite?(pages: SitePage[], ctx: SiteContext<O>): Finding[]
 }

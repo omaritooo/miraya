@@ -162,6 +162,9 @@ describe('performance', () => {
     expect(route?.errors).toEqual([])
     expect(result.performance).toMatchObject({ network: 'Unthrottled', runs: 1 })
     expect(route?.perf?.ltr?.lcp?.ms).toBeLessThan(2500)
+    // Vite's dev server sends its hot-reload client, so the findings are for reference only.
+    expect(route?.perf?.rtl?.devServer).toBe(true)
+    expect(new Set(route?.findings.map((f) => f.severity))).toEqual(new Set(['info']))
     expect(route?.perf?.rtl?.lcp).toMatchObject({ selector: expect.stringContaining('h1') })
     expect(route?.perf?.rtl?.oversizedImages[0]).toMatchObject({
       natural: { w: 400, h: 300 },
@@ -246,7 +249,7 @@ describe('HTML report', () => {
   it('opens from disk, draws numbered outlines, shows details, and passes axe', async () => {
     const outDir = mkdtempSync(join(tmpdir(), 'miraya-html-'))
     const result = await audit({
-      config,
+      config: parseConfig({ ...config, checks: ['localization', 'seo'] }),
       routes: ['/not-mirrored/bad', '/not-mirrored/good'],
       browser,
       outDir,
@@ -279,6 +282,15 @@ describe('HTML report', () => {
       await expect.poll(() => page.locator('.head-table tbody tr').count()).toBe(8)
       const seoAxe = await new AxeBuilder({ page }).analyze()
       expect(seoAxe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+      // Site views: both pages share an Arabic title, so they're grouped.
+      await page.getByRole('link', { name: /Titles and descriptions/ }).click()
+      await expect.poll(() => page.locator('.site-group').count()).toBe(1)
+      const titlesAxe = await new AxeBuilder({ page }).analyze()
+      expect(titlesAxe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+      await page.getByRole('link', { name: /Language links/ }).click()
+      await expect.poll(() => page.locator('.site-table tbody tr').count()).toBe(2)
+      const linksAxe = await new AxeBuilder({ page }).analyze()
+      expect(linksAxe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
     } finally {
       await context.close()
     }

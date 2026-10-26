@@ -100,6 +100,11 @@ describe('performance rules', () => {
     expect(findings[1]?.message).toBe('1 file holds up the first paint: app.css (40 KB).')
   })
 
+  it("list a dev server's numbers as info, which never fails the run", () => {
+    const findings = check(pair({ devServer: true }, { devServer: true, lcp: { ms: 4200 } }))
+    expect(brief(findings)).toEqual(['lcp-budget rtl info'])
+  })
+
   it('check the Arabic page alone in rtl-only mode', () => {
     expect(brief(check(pair(undefined, { cls: 0.3 })))).toEqual(['cls-budget rtl warn'])
   })

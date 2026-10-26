@@ -62,6 +62,10 @@ const RULES: Record<string, { title: string; fix: string }> = {
     title: 'Images are larger than they are drawn',
     fix: 'Serve each image at the size it is drawn, with srcset and sizes for different screens.',
   },
+  'duplicate-title': {
+    title: 'Several pages share a title or description',
+    fix: 'Give each page a title and description of its own, naming what is on it, so search results tell them apart.',
+  },
   'page-title': {
     title: 'The title is missing, too long or untranslated',
     fix: 'Give every page its own <title> in its own language, under 60 characters, with the most specific words first.',
@@ -144,6 +148,7 @@ export const SIDE_WORDS: Record<string, string> = {
 /** Evidence keys in plain words. Keys without an entry keep their own name. */
 const EVIDENCE: Record<string, string> = {
   check: 'What failed',
+  pages: 'Pages that share it',
   budget: 'Budget',
   ltr: 'English',
   rtl: 'Arabic',

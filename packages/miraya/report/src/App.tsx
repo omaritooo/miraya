@@ -22,6 +22,7 @@ import { Segmented, SeverityCounts } from './ui'
 import { CrossStage } from './CrossStage'
 import { PerfStage, seconds } from './PerfStage'
 import { SeoStage } from './SeoStage'
+import { SITE_VIEWS, SiteView } from './SiteView'
 import { Stage } from './Stage'
 
 function useHashFilters(): [Filters, (next: Partial<Filters>) => void] {
@@ -139,9 +140,15 @@ function Report({
 
   return (
     <div className="app">
-      <a className="skip" href="#inspector">
-        Skip to findings
-      </a>
+      {filters.area === 'seo' && filters.site ? (
+        <a className="skip" href="#site-view">
+          Skip to the table
+        </a>
+      ) : (
+        <a className="skip" href="#inspector">
+          Skip to findings
+        </a>
+      )}
       <header className="topbar">
         <div className="topbar-run">
           <p className="brand">
@@ -157,12 +164,18 @@ function Report({
             {areas.map((a) => (
               <a
                 key={a.id}
-                href={writeHash({ ...filters, area: a.id, finding: undefined, rule: undefined })}
+                href={writeHash({
+                  ...filters,
+                  area: a.id,
+                  finding: undefined,
+                  rule: undefined,
+                  site: undefined,
+                })}
                 aria-current={a.id === filters.area ? 'page' : undefined}
                 className="area"
                 onClick={(e) => {
                   e.preventDefault()
-                  update({ area: a.id, finding: undefined, rule: undefined })
+                  update({ area: a.id, finding: undefined, rule: undefined, site: undefined })
                 }}
               >
                 <span className={`area-dot area-${a.id}`} aria-hidden="true" />
@@ -227,7 +240,13 @@ function Report({
           update={update}
           inputRef={pageFilter}
         />
-        {route ? (
+        {filters.area === 'seo' && filters.site ? (
+          <SiteView
+            report={report}
+            site={filters.site}
+            onOpen={(r, finding) => update({ route: r, finding, site: undefined })}
+          />
+        ) : route ? (
           <>
             {filters.area === 'cross-browser' ? (
               <CrossStage
@@ -382,6 +401,47 @@ function Pages({
         />
         <kbd aria-hidden="true">/</kbd>
       </div>
+      {filters.area === 'seo' && report.routes.some((r) => r.head) ? (
+        <>
+          <h2 className="overline">Site</h2>
+          <ul className="page-list">
+            {SITE_VIEWS.map((v) => {
+              const pages = report.routes.filter((r) =>
+                r.findings.some((f) => v.rules.includes(f.rule) && !isKnown(f)),
+              )
+              const sev = worst(
+                report.routes.flatMap((r) => r.findings.filter((f) => v.rules.includes(f.rule))),
+              )
+              return (
+                <li key={v.id}>
+                  <a
+                    href={writeHash({ ...filters, site: v.id, finding: undefined })}
+                    aria-current={filters.site === v.id ? 'page' : undefined}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      update({ site: v.id, finding: undefined })
+                    }}
+                  >
+                    <span className={`glyph ${sev ? `sev-${sev}` : ''}`} aria-hidden="true">
+                      {sev ? GLYPHS[sev] : '○'}
+                    </span>
+                    <span className="page-path">{v.label}</span>
+                    {pages.length ? (
+                      <span className="page-count">
+                        {pages.length}
+                        <span className="sr">
+                          {' '}
+                          {pages.length === 1 ? 'page' : 'pages'} with findings
+                        </span>
+                      </span>
+                    ) : null}
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      ) : null}
       <h2 className="overline">Pages · {report.routes.length}</h2>
       <ul className="page-list">
         {listed.map((r) => {
@@ -392,10 +452,10 @@ function Pages({
             <li key={r.route}>
               <a
                 href={writeHash({ ...filters, route: r.route, finding: undefined })}
-                aria-current={r === current ? 'page' : undefined}
+                aria-current={r === current && !filters.site ? 'page' : undefined}
                 onClick={(e) => {
                   e.preventDefault()
-                  update({ route: r.route, finding: undefined })
+                  update({ route: r.route, finding: undefined, site: undefined })
                 }}
               >
                 <span

@@ -16,7 +16,7 @@ import type {
   Rule,
   SnapshotPair,
 } from '../types'
-import { ConfigError, resolveRules, runRules } from './engine'
+import { ConfigError, resolveRules, runRules, runSiteRules } from './engine'
 import { applyBaseline, readBaseline } from './baseline'
 import { buildCrops, screenshotFrame } from './crops'
 import { loadTranslations } from './translations'
@@ -195,6 +195,22 @@ export async function audit(options: AuditOptions): Promise<Report> {
         }
       }),
     )
+
+    // Rules that compare pages run once every page is done, on the pages that loaded.
+    const site = runSiteRules(
+      results.flatMap((r) =>
+        r.status === 'ok' && r.head?.rtl
+          ? [{ route: r.route, head: { ...r.head, rtl: r.head.rtl } }]
+          : [],
+      ),
+      resolved,
+      config,
+    )
+    for (const r of results) {
+      const own = site.findings.filter((f) => f.route === r.route)
+      if (own.length) r.findings = [...r.findings, ...own]
+      if (site.errors.length && r.status === 'ok') r.errors = [...r.errors, ...site.errors]
+    }
 
     const name = browser.browserType().name()
     const engine = `${name[0]?.toUpperCase()}${name.slice(1)} ${browser.version().split('.')[0]}`

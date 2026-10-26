@@ -12,6 +12,7 @@ import type {
   Rule,
   RuleContext,
   Severity,
+  SitePage,
   SnapshotPair,
   Translations,
 } from '../types'
@@ -134,28 +135,10 @@ export function runRules(
       },
       crop: (dir, key) => crops[dir]?.get(key) ?? null,
       ...(translations ? { translations } : {}),
-      finding: (input) => {
-        let level = severity
-        if (input.severity && SEVERITY_RANK[input.severity] < SEVERITY_RANK[level]) {
-          level = input.severity
-        }
-        if (input.match && meta.minMatch && MATCH_RANK[input.match] < MATCH_RANK[meta.minMatch]) {
-          level = LOWER[level]
-        }
-        const { el, severity: _requested, ...rest } = input
-        const finding: Finding = {
-          ...rest,
-          id: fingerprint(rule, input),
-          area,
-          severity: level,
-          docsUrl: `${DOCS_BASE_URL}${meta.docs}`,
-        }
-        if (el?.sourceHint && !finding.sourceHint) finding.sourceHint = el.sourceHint
-        return finding
-      },
+      finding: (input) => makeFinding(rule, severity, input),
     }
     try {
-      findings.push(...rule.check(pair, ctx))
+      findings.push(...(rule.check?.(pair, ctx) ?? []))
     } catch (error) {
       errors.push({
         kind: 'rule-crashed',
@@ -173,6 +156,61 @@ export function runRules(
       a.selector.localeCompare(b.selector),
   )
   return { findings: mergeRepeats(findings), skippedRules, errors }
+}
+
+/** A rule's finding at its resolved severity, which the rule may lower but never raise. */
+function makeFinding(rule: Rule<unknown>, severity: Severity, input: FindingInput): Finding {
+  const { meta } = rule
+  let level = severity
+  if (input.severity && SEVERITY_RANK[input.severity] < SEVERITY_RANK[level]) {
+    level = input.severity
+  }
+  if (input.match && meta.minMatch && MATCH_RANK[input.match] < MATCH_RANK[meta.minMatch]) {
+    level = LOWER[level]
+  }
+  const { el, severity: _requested, ...rest } = input
+  const finding: Finding = {
+    ...rest,
+    id: fingerprint(rule, input),
+    area: meta.area ?? 'localization',
+    severity: level,
+    docsUrl: `${DOCS_BASE_URL}${meta.docs}`,
+  }
+  if (el?.sourceHint && !finding.sourceHint) finding.sourceHint = el.sourceHint
+  return finding
+}
+
+/**
+ * Runs the rules that compare pages, over every page that was audited. Findings carry their
+ * own route; a rule that throws becomes an error on every page it would have checked.
+ */
+export function runSiteRules(
+  pages: SitePage[],
+  resolved: ResolvedRule[],
+  config: ResolvedConfig,
+): { findings: Finding[]; errors: RouteError[] } {
+  const findings: Finding[] = []
+  const errors: RouteError[] = []
+  for (const { rule, severity, options } of resolved) {
+    if (!rule.checkSite) continue
+    try {
+      findings.push(
+        ...rule.checkSite(pages, {
+          options,
+          config,
+          finding: (input) => makeFinding(rule, severity, input),
+        }),
+      )
+    } catch (error) {
+      errors.push({
+        kind: 'rule-crashed',
+        rule: rule.meta.id,
+        message: error instanceof Error ? error.message : String(error),
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      })
+    }
+  }
+  return { findings, errors }
 }
 
 /**

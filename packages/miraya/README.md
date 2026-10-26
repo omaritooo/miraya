@@ -298,6 +298,7 @@ Miraya reads the tags search engines and link previews use, from both renders, a
 | [`single-h1`](#single-h1)               | warn    | No `<h1>`, or several                                              |
 | [`social-preview`](#social-preview)     | info    | Missing `og:title`, `og:description` or `og:image`                 |
 | [`structured-data`](#structured-data)   | error   | JSON-LD that isn't valid JSON, or has no `@type`                   |
+| [`duplicate-title`](#duplicate-title)   | warn    | Pages that share a title or description                            |
 
 SEO rules run on every page, whether or not its Arabic render is right to left. Switch the area off with `checks: ['localization']`.
 
@@ -352,6 +353,12 @@ Chat apps and social networks draw shared links from the Open Graph tags. Withou
 JSON-LD (`<script type="application/ld+json">`) describes a page to search engines: a product, an article, an organisation. A block that isn't valid JSON is ignored, and one without `@type` says nothing.
 
 **Fix:** make each block valid JSON with an `@type`, and check it with a structured data validator.
+
+### `duplicate-title`
+
+Search results can't tell pages with the same title apart, and may show only one. This rule compares every audited page, per language, once the run is done. The report's SEO tab lists all titles and descriptions under **Site**, with the shared ones grouped, next to a table of each page's language links.
+
+**Fix:** give each page a title and description of its own, naming what's on it.
 
 ## Performance
 

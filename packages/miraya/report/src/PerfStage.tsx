@@ -108,6 +108,7 @@ export function PerfStage({
     (a, b) => (route.perf?.[b]?.lcp?.ms ?? 0) - (route.perf?.[a]?.lcp?.ms ?? 0),
   )[0]
   const over = findings.filter((f) => f.evidence.check === 'over')
+  const dev = measured.some((d) => route.perf?.[d]?.devServer)
 
   return (
     <main className="stage perf" aria-label="Metrics">
@@ -139,6 +140,16 @@ export function PerfStage({
       </div>
 
       <div className="seo-body">
+        {dev ? (
+          <div className="banner banner-warn" role="note">
+            <span aria-hidden="true">▲</span>
+            <p>
+              This run used a development server, so the numbers only count against a production
+              build. They're shown greyed for reference, and findings are listed as info that
+              doesn't fail the run.
+            </p>
+          </div>
+        ) : null}
         {!route.perf ? (
           <p className="state muted">
             {route.status === 'error'
@@ -150,7 +161,7 @@ export function PerfStage({
         ) : (
           <>
             <div className="table-box">
-              <table className="metrics">
+              <table className={`metrics${dev ? ' dev' : ''}`}>
                 <caption className="sr">Metrics against budget</caption>
                 <thead>
                   <tr>
