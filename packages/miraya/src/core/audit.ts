@@ -8,6 +8,7 @@ import { CollectorError } from '../collector'
 import { builtinRules } from '../rules'
 import type {
   Engine,
+  RunInfo,
   Finding,
   Report,
   ResolvedConfig,
@@ -57,6 +58,30 @@ export type AuditOptions = {
   rules?: Rule<unknown>[]
   /** Overrides config.baseline: a path, or false to ignore baselines. */
   baseline?: string | false
+  /** Where the run came from: branch, commit, pull request. See detectRun. */
+  run?: RunInfo
+  /** Called as each page finishes, with the report so far, so report.html can fill in live. */
+  onProgress?: (report: Report) => void
+}
+
+/** How the languages are switched, in words, for the report's run facts. */
+function localeWords(config: ResolvedConfig): string | undefined {
+  const l = config.locale
+  if (typeof l === 'function') return 'by a custom switch'
+  switch (l.strategy) {
+    case 'path-prefix':
+      return `${l.ltr.replace(/^\//, '') || 'en'} → ${l.rtl.replace(/^\//, '')}, by ${l.rtl} prefix`
+    case 'query':
+      return `${l.ltr} → ${l.rtl}, by ?${l.param}=`
+    case 'cookie':
+      return `${l.ltr} → ${l.rtl}, by the ${l.name} cookie`
+    case 'local-storage':
+      return `${l.ltr} → ${l.rtl}, by localStorage ${l.key}`
+    case 'context-locale':
+      return `${l.ltr} → ${l.rtl}, by browser locale`
+    case 'attribute':
+      return 'by the dir attribute'
+  }
 }
 
 class RouteTimeout extends Error {}
@@ -185,6 +210,54 @@ export async function audit(options: AuditOptions): Promise<Report> {
       throw new ConfigError(`Base URL ${config.baseUrl} is unreachable: ${String(error)}`)
     }
 
+    const assemble = (results: RouteResult[]): Report => {
+      const name = browser.browserType().name()
+      const engine = `${name[0]?.toUpperCase()}${name.slice(1)} ${browser.version().split('.')[0]}`
+      const performance: Report['performance'] = measuring
+        ? {
+            engine,
+            cpuSlowdown: config.performance.cpuSlowdown,
+            network: NETWORK_NAMES[config.performance.network],
+            runs: config.performance.runs,
+            warmUp: config.performance.warmUp,
+            budgets: config.performance.budgets,
+          }
+        : undefined
+      const findings = results.flatMap((r) => r.findings)
+      const count = (severity: Finding['severity']) =>
+        findings.filter((f) => f.severity === severity).length
+      return applyBaseline(
+        {
+          schemaVersion: 1,
+          tool: { name: 'miraya', version: pkg.version },
+          startedAt: new Date(started).toISOString(),
+          durationMs: Date.now() - started,
+          config: {
+            hash: configHash(config),
+            viewport: config.viewport,
+            mode: rtlOnly ? 'rtl-only' : 'pair',
+            checks: config.checks,
+            ...(localeWords(config) ? { locale: localeWords(config) } : {}),
+          },
+          summary: {
+            routes: results.length,
+            routeErrors: results.filter((r) => r.status === 'error').length,
+            findings: { error: count('error'), warn: count('warn'), info: count('info') },
+            new: findings.length,
+            baselined: 0,
+            fixed: 0,
+          },
+          ...(options.run ? { run: options.run } : {}),
+          ...(baseline ? { baseline: { entries: baseline.entries.length } } : {}),
+          ...(engines.length > 1 ? { engines } : {}),
+          ...(performance ? { performance } : {}),
+          routes: results,
+          fixed: [],
+        },
+        baseline,
+      )
+    }
+
     // Results keep route order whatever order workers finish in, so reports stay deterministic.
     const results: RouteResult[] = new Array(routes.length)
     let next = 0
@@ -193,6 +266,10 @@ export async function audit(options: AuditOptions): Promise<Report> {
         while (next < routes.length) {
           const index = next++
           results[index] = await auditRoute(routes[index] as string, worker)
+          if (options.onProgress) {
+            const done = results.filter(Boolean)
+            options.onProgress({ ...assemble(done), running: { total: routes.length } })
+          }
         }
       }),
     )
@@ -213,47 +290,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
       if (site.errors.length && r.status === 'ok') r.errors = [...r.errors, ...site.errors]
     }
 
-    const name = browser.browserType().name()
-    const engine = `${name[0]?.toUpperCase()}${name.slice(1)} ${browser.version().split('.')[0]}`
-    const performance: Report['performance'] = measuring
-      ? {
-          engine,
-          cpuSlowdown: config.performance.cpuSlowdown,
-          network: NETWORK_NAMES[config.performance.network],
-          runs: config.performance.runs,
-          warmUp: config.performance.warmUp,
-          budgets: config.performance.budgets,
-        }
-      : undefined
-    const findings = results.flatMap((r) => r.findings)
-    const count = (severity: Finding['severity']) =>
-      findings.filter((f) => f.severity === severity).length
-    return applyBaseline(
-      {
-        schemaVersion: 1,
-        tool: { name: 'miraya', version: pkg.version },
-        startedAt: new Date(started).toISOString(),
-        durationMs: Date.now() - started,
-        config: {
-          hash: configHash(config),
-          viewport: config.viewport,
-          mode: rtlOnly ? 'rtl-only' : 'pair',
-        },
-        summary: {
-          routes: results.length,
-          routeErrors: results.filter((r) => r.status === 'error').length,
-          findings: { error: count('error'), warn: count('warn'), info: count('info') },
-          new: findings.length,
-          baselined: 0,
-          fixed: 0,
-        },
-        ...(engines.length > 1 ? { engines } : {}),
-        ...(performance ? { performance } : {}),
-        routes: results,
-        fixed: [],
-      },
-      baseline,
-    )
+    return assemble(results)
   } finally {
     await Promise.all(
       pools.flatMap((w) => [w.main.close(), ...w.others.map((o) => o.contexts.close())]),

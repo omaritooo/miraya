@@ -16,6 +16,7 @@ import {
   type Finding,
   type PagePerf,
   type RouteResult,
+  type RunInfo,
   type View,
 } from './data'
 
@@ -29,6 +30,7 @@ export function Inspector({
   tab,
   onTab,
   area,
+  run,
 }: {
   route: RouteResult
   findings: Finding[]
@@ -37,6 +39,7 @@ export function Inspector({
   tab: Tab
   onTab: (tab: Tab) => void
   area: View
+  run?: RunInfo | undefined
 }) {
   const notes = [
     ...route.notes,
@@ -79,6 +82,7 @@ export function Inspector({
             findings={findings}
             selected={selected}
             onSelect={onSelect}
+            run={run}
           />
         </div>
       ) : (
@@ -104,12 +108,14 @@ function Findings({
   findings,
   selected,
   onSelect,
+  run,
 }: {
   route: RouteResult
   area: View
   findings: Finding[]
   selected: Finding | undefined
   onSelect: (id: string) => void
+  run?: RunInfo | undefined
 }) {
   const inArea = route.findings.filter((f) => inView(f, area))
   const hidden = inArea.length - findings.length
@@ -177,7 +183,7 @@ function Findings({
         ))}
       </ol>
       {hidden > 0 ? <p className="caption list-note">{hidden} filtered out</p> : null}
-      {selected ? <Detail finding={selected} /> : null}
+      {selected ? <Detail finding={selected} run={run} /> : null}
     </>
   )
 }
@@ -263,9 +269,41 @@ const MATCH_WORDS: Record<string, string> = {
   heuristic: 'by position and text',
 }
 
-function Detail({ finding }: { finding: Finding }) {
+/** Copies text, saying so for a moment. Clipboard access can be blocked for file:// pages. */
+function useCopy(): [string | undefined, (text: string, what: string) => void] {
+  const [copied, setCopied] = useState<string>()
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(what)
+      setTimeout(() => setCopied(undefined), 1500)
+    } catch {
+      // The command stays on screen to select by hand.
+    }
+  }
+  return [copied, copy]
+}
+
+/** A GitHub issue with the finding filled in, when the run knows its repository. */
+function issueUrl(finding: Finding, repo: string) {
+  const title = `${finding.rule} on ${finding.route}${finding.label ? `: ${finding.label}` : ''}`
+  const body = [
+    finding.message,
+    '',
+    `- Page: \`${finding.route}\``,
+    `- Element: \`${finding.selector}\``,
+    `- Fingerprint: \`${finding.id.slice(0, 10)}\``,
+    ...(finding.sourceHint ? [`- Source: \`${finding.sourceHint}\``] : []),
+    '',
+    `Details: \`npx miraya explain ${finding.id.slice(0, 10)}\` · ${finding.docsUrl}`,
+  ].join('\n')
+  return `https://github.com/${repo}/issues/new?${new URLSearchParams({ title, body })}`
+}
+
+function Detail({ finding, run }: { finding: Finding; run?: RunInfo | undefined }) {
   const command = `npx miraya explain ${finding.id.slice(0, 10)}`
-  const [copied, setCopied] = useState(false)
+  const accept = `npx miraya baseline accept ${finding.id}`
+  const [copied, copy] = useCopy()
   const fix = ruleFix(finding)
   const { text, translation, translationKey, translationFile } = finding.evidence
   const parts = finding.selector.split(/(?<=\s>\s)(?=[^>]*$)/)
@@ -337,6 +375,13 @@ function Detail({ finding }: { finding: Finding }) {
               <dt>Text</dt>
               <dd>
                 <bdi>{text}</bdi>
+              </dd>
+            </>
+          ) : finding.text ? (
+            <>
+              <dt>Text</dt>
+              <dd>
+                <bdi>{finding.text}</bdi>
               </dd>
             </>
           ) : null}
@@ -455,26 +500,44 @@ function Detail({ finding }: { finding: Finding }) {
             type="button"
             className="button button-sm"
             aria-label="Copy explain command"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(command)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-              } catch {
-                // Clipboard access can be blocked for file:// pages; the command stays selectable.
-              }
-            }}
+            onClick={() => copy(command, 'explain')}
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied === 'explain' ? 'Copied' : 'Copy'}
           </button>
           <span className="sr" role="status">
-            {copied ? 'Command copied' : ''}
+            {copied === 'explain'
+              ? 'Command copied'
+              : copied === 'accept'
+                ? 'Accept command copied: run it in the project'
+                : ''}
           </span>
         </div>
-        <a className="docs-link" href={finding.docsUrl} target="_blank" rel="noreferrer">
-          Why and how to fix <span aria-hidden="true">↗</span>
-          <span className="sr"> (opens in a new tab)</span>
-        </a>
+        <div className="detail-actions">
+          {run?.repo ? (
+            <a
+              className="button button-primary"
+              href={issueUrl(finding, run.repo)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Create issue<span className="sr"> on GitHub (opens in a new tab)</span>
+            </a>
+          ) : null}
+          {isKnown(finding) ? null : (
+            <button
+              type="button"
+              className="button"
+              title={accept}
+              onClick={() => copy(accept, 'accept')}
+            >
+              {copied === 'accept' ? 'Command copied' : 'Accept into baseline'}
+            </button>
+          )}
+          <a className="docs-link" href={finding.docsUrl} target="_blank" rel="noreferrer">
+            Why and how to fix <span aria-hidden="true">↗</span>
+            <span className="sr"> (opens in a new tab)</span>
+          </a>
+        </div>
       </div>
     </section>
   )

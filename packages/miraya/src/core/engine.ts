@@ -135,7 +135,12 @@ export function runRules(
       },
       crop: (dir, key) => crops[dir]?.get(key) ?? null,
       ...(translations ? { translations } : {}),
-      finding: (input) => makeFinding(rule, severity, input),
+      finding: (input) => {
+        // The English twin names the element: Arabic text isn't kept.
+        const el = input.el
+        const m = el && rtlByKey.get(el.key) === el ? twins.get(el.key) : undefined
+        return makeFinding(rule, severity, input, m ? ltrByKey.get(m.ltr) : el)
+      },
     }
     try {
       findings.push(...(rule.check?.(pair, ctx) ?? []))
@@ -159,7 +164,12 @@ export function runRules(
 }
 
 /** A rule's finding at its resolved severity, which the rule may lower but never raise. */
-function makeFinding(rule: Rule<unknown>, severity: Severity, input: FindingInput): Finding {
+function makeFinding(
+  rule: Rule<unknown>,
+  severity: Severity,
+  input: FindingInput,
+  english?: ElementSnap,
+): Finding {
   const { meta } = rule
   let level = severity
   if (input.severity && SEVERITY_RANK[input.severity] < SEVERITY_RANK[level]) {
@@ -177,7 +187,66 @@ function makeFinding(rule: Rule<unknown>, severity: Severity, input: FindingInpu
     docsUrl: `${DOCS_BASE_URL}${meta.docs}`,
   }
   if (el?.sourceHint && !finding.sourceHint) finding.sourceHint = el.sourceHint
+  if (el) {
+    const text = (english ?? el).text?.value ?? el.text?.value
+    const label = describe(el, text)
+    if (label) finding.label = label
+    if (text) finding.text = text
+  }
   return finding
+}
+
+const KINDS: Record<string, string> = {
+  // ARIA roles, in plain words.
+  complementary: 'sidebar',
+  navigation: 'navigation',
+  banner: 'header',
+  contentinfo: 'footer',
+  listitem: 'item',
+  textbox: 'field',
+  searchbox: 'search field',
+  combobox: 'menu',
+  img: 'image',
+  menuitem: 'menu item',
+  // Tags without a role.
+  a: 'link',
+  button: 'button',
+  svg: 'icon',
+  input: 'field',
+  textarea: 'field',
+  select: 'menu',
+  nav: 'navigation',
+  ul: 'list',
+  ol: 'list',
+  table: 'table',
+  form: 'form',
+  header: 'header',
+  footer: 'footer',
+  aside: 'sidebar',
+  h1: 'heading',
+  h2: 'heading',
+  h3: 'heading',
+  h4: 'heading',
+  h5: 'heading',
+  h6: 'heading',
+}
+
+/** What the element is, in words, for the findings list: "Sign in link", "Checkout button". */
+export function describe(el: ElementSnap, text?: string): string | undefined {
+  const kind = KINDS[el.role ?? ''] ?? (el.role && el.role !== 'generic' ? el.role : KINDS[el.tag])
+  const short = (s: string) => (s.length > 32 ? `${s.slice(0, 31)}…` : s)
+  const name =
+    text ??
+    el.icon?.label ??
+    el.icon?.name ??
+    el.testId
+      ?.replace(/[-_]+/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .toLowerCase()
+  if (!name) return kind ? `${kind[0]?.toUpperCase()}${kind.slice(1)}` : undefined
+  const words = short(name.trim())
+  const label = `${words[0]?.toUpperCase()}${words.slice(1)}`
+  return kind && !label.toLowerCase().endsWith(kind) ? `${label} ${kind}` : label
 }
 
 /**

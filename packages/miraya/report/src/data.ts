@@ -7,7 +7,10 @@ import type {
   Report,
   ResourceType,
   RouteResult,
+  RunInfo,
   Severity,
+  HistoryRun,
+  HistoryFinding,
 } from '../../src/types'
 
 export type {
@@ -19,7 +22,10 @@ export type {
   Report,
   ResourceType,
   RouteResult,
+  RunInfo,
   Severity,
+  HistoryRun,
+  HistoryFinding,
 }
 
 /** What core/report.ts inlines into the page. */
@@ -27,7 +33,21 @@ export type ReportData = {
   report: Report
   /** Screenshot path from report.json to a data: URI, or to the relative path when not inlined. */
   images: Record<string, string>
+  /** dashboard.html beside the report, when the run kept history. */
+  dashboardHref?: string
 }
+
+/** What core/history.ts inlines for dashboard.html. */
+export type DashboardData = {
+  kind: 'dashboard'
+  runs: HistoryRun[]
+  latest?: Report
+  reportHref?: string
+}
+
+export type ViewerData = ReportData | DashboardData
+export const isDashboard = (d: ViewerData): d is DashboardData =>
+  'kind' in d && d.kind === 'dashboard'
 
 export const SEVERITIES: Severity[] = ['error', 'warn', 'info']
 export const STATUSES = ['new', 'known', 'all'] as const
@@ -72,6 +92,8 @@ export type Filters = {
   status: Status
   /** A site-wide SEO table instead of one page. */
   site?: 'titles' | 'links'
+  /** The sidebar lists pages, or rules with their counts. Absent picks by size. */
+  group?: 'page' | 'rule'
 }
 
 const list = <T extends string>(value: string | null, allowed: readonly T[]): T[] =>
@@ -89,6 +111,9 @@ export function readHash(hash: string): Filters {
     ...(params.get('rule') ? { rule: params.get('rule') as string } : {}),
     severity: list(params.get('severity'), SEVERITIES),
     status: status && STATUSES.includes(status) ? status : 'new',
+    ...(params.get('group') === 'page' || params.get('group') === 'rule'
+      ? { group: params.get('group') as 'page' | 'rule' }
+      : {}),
     ...(params.get('site') === 'titles' || params.get('site') === 'links'
       ? { site: params.get('site') as 'titles' | 'links' }
       : {}),
@@ -104,6 +129,7 @@ export function writeHash(filters: Filters): string {
   if (filters.rule) params.set('rule', filters.rule)
   if (filters.status !== 'new') params.set('status', filters.status)
   if (filters.site) params.set('site', filters.site)
+  if (filters.group) params.set('group', filters.group)
   return `#${params.toString()}`
 }
 

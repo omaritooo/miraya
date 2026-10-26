@@ -116,6 +116,10 @@ export function Stage({
         ) : null}
       </div>
 
+      {!failed && selected?.rule === 'document-direction' ? (
+        <WholePage finding={selected} route={route} />
+      ) : null}
+
       <div className="screens" style={{ '--panes': sides.length } as CSSProperties}>
         {failed ? (
           <Failed route={route} />
@@ -146,19 +150,52 @@ export function Stage({
   )
 }
 
+const pathOf = (url: string) => {
+  try {
+    const u = new URL(url)
+    return `${u.pathname}${u.search}`
+  } catch {
+    return url
+  }
+}
+
 function Failed({ route }: { route: RouteResult }) {
   return (
     <div className="state" role="alert">
-      <span className="state-mark sev-error" aria-hidden="true">
-        ⊠
-      </span>
-      <h2>Page couldn't be audited</h2>
+      <h2 className="sr">Page couldn't be audited</h2>
       {route.errors.map((e, i) => {
         const failure = FAILURES[e.kind] ?? { title: e.kind }
+        const landed = e.finalUrl ? pathOf(e.finalUrl) : undefined
         return (
-          <div key={i} className="state-body">
+          <div key={i} className="failure">
+            <p className="failure-title">
+              <span aria-hidden="true">⊠</span> {failure.title}
+              {landed ? (
+                <>
+                  {' '}
+                  to{' '}
+                  <bdi dir="ltr">
+                    <code>{landed.split('?')[0]}</code>
+                  </bdi>
+                </>
+              ) : null}
+            </p>
             <p>
-              <strong>{failure.title}.</strong> {e.message}
+              {landed ? (
+                <>
+                  Miraya asked for{' '}
+                  <bdi dir="ltr">
+                    <code>{route.route}</code>
+                  </bdi>{' '}
+                  and ended on{' '}
+                  <bdi dir="ltr">
+                    <code>{landed}</code>
+                  </bdi>
+                  . Save a session once, then rerun.
+                </>
+              ) : (
+                e.message
+              )}
             </p>
             {failure.command ? (
               <code className="command" dir="ltr">
@@ -169,8 +206,41 @@ function Failed({ route }: { route: RouteResult }) {
           </div>
         )
       })}
-      <p className="muted">Other pages report normally. The run exits with 2.</p>
+      <p className="muted">
+        Other pages report normally. The run exits with 2 and the header says how many pages
+        couldn't be audited.
+      </p>
     </div>
+  )
+}
+
+/** A finding about the whole document: the fix is one tag, so show the tag, not a screenshot. */
+function WholePage({ finding, route }: { finding: Finding; route: RouteResult }) {
+  const lang = String(finding.evidence.lang || 'ar')
+  const skipped = route.skippedRules.length
+  return (
+    <section className="whole-page" aria-label="About the whole page">
+      <p className="detail-tags">
+        <span className={`sev-word sev-${finding.severity}`}>
+          <span aria-hidden="true">◆</span> {finding.rule}
+        </span>
+        <span className="tag">Whole page</span>
+      </p>
+      <p>{finding.message}</p>
+      <pre dir="ltr">
+        {'<html lang="'}
+        {lang}
+        {'" '}
+        <ins>dir="rtl"</ins>
+        {'>'}
+      </pre>
+      {skipped ? (
+        <p className="note">
+          {plural(skipped, 'other rule')} {skipped === 1 ? 'was' : 'were'} skipped on this page
+          until this is fixed. SEO and Performance still ran.
+        </p>
+      ) : null}
+    </section>
   )
 }
 

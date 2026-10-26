@@ -13,10 +13,15 @@ import {
   type Filters,
   type Finding,
   type Report as ReportJson,
+  isDashboard,
   type ReportData,
   type RouteResult,
   type Status,
+  type View,
+  type ViewerData,
 } from './data'
+import { Dashboard } from './Dashboard'
+import { areaState, AreaPassed, FirstRun, SwitchedOff } from './States'
 import { Inspector, type Tab } from './Inspector'
 import { Segmented, SeverityCounts } from './ui'
 import { CrossStage } from './CrossStage'
@@ -53,8 +58,17 @@ const SEVERITY_FILTERS = { error: 'Errors', warn: 'Warnings', info: 'Info' } as 
 const STATUS_LABELS: Record<Status, string> = { new: 'New', known: 'Known', all: 'All' }
 // Below this many clean pages they're listed; above it they fold into one row.
 const CLEAN_LISTED = 3
+// Above this many findings in an area, the sidebar opens grouped by rule; above the
+// smaller one it offers the choice.
+const GROUP_ABOVE = 300
+const GROUP_TOGGLE = 40
 
-export function App({ data }: { data: ReportData | null }) {
+export function App({ data }: { data: ViewerData | null }) {
+  if (data && isDashboard(data)) return <Dashboard data={data} />
+  return <ReportApp data={data} />
+}
+
+function ReportApp({ data }: { data: ReportData | null }) {
   const [filters, update] = useHashFilters()
   if (!data) {
     return (
@@ -64,12 +78,21 @@ export function App({ data }: { data: ReportData | null }) {
       </main>
     )
   }
-  return <Report report={data.report} images={data.images} filters={filters} update={update} />
+  return (
+    <Report
+      report={data.report}
+      images={data.images}
+      dashboardHref={data.dashboardHref}
+      filters={filters}
+      update={update}
+    />
+  )
 }
 
 function Report({
   report,
   images,
+  dashboardHref,
   filters,
   update,
 }: ReportData & { filters: Filters; update: (next: Partial<Filters>) => void }) {
@@ -86,9 +109,11 @@ function Report({
       ].sort(),
     [report, inArea],
   )
-  // SEO shows once a report has head tags: reports from before 0.4 have only localization.
+  // Reports that list their checks show every area, saying which are off. Older ones show
+  // only what they have: SEO once there are head tags, the rest once they have findings.
   const areas = AREAS.filter(
     (a) =>
+      !!report.config.checks ||
       a.id === 'localization' ||
       a.id === filters.area ||
       (a.id === 'seo' && report.routes.some((r) => r.head)) ||
@@ -137,6 +162,18 @@ function Report({
 
   const all = report.routes.flatMap((r) => r.findings)
   const open = all.filter((f) => !isKnown(f))
+  const state = areaState(report, filters.area)
+  // An area with nothing new anywhere opens on a summary, until someone asks for the pages.
+  const [browsing, setBrowsing] = useState<View[]>([])
+  const passed =
+    state === 'on' &&
+    !report.running &&
+    filters.status === 'new' &&
+    !filters.route &&
+    !filters.site &&
+    !browsing.includes(filters.area) &&
+    report.routes.every((r) => r.status === 'ok') &&
+    !open.some((f) => inView(f, filters.area))
 
   return (
     <div className="app">
@@ -158,31 +195,48 @@ function Report({
           <RunFacts report={report} />
           <span className="spacer" />
           <Verdict report={report} />
+          {dashboardHref ? (
+            <a className="dashboard-link" href={dashboardHref}>
+              Open in dashboard
+            </a>
+          ) : null}
         </div>
         <div className="topbar-areas">
           <nav className="areas" aria-label="Areas">
-            {areas.map((a) => (
-              <a
-                key={a.id}
-                href={writeHash({
-                  ...filters,
-                  area: a.id,
-                  finding: undefined,
-                  rule: undefined,
-                  site: undefined,
-                })}
-                aria-current={a.id === filters.area ? 'page' : undefined}
-                className="area"
-                onClick={(e) => {
-                  e.preventDefault()
-                  update({ area: a.id, finding: undefined, rule: undefined, site: undefined })
-                }}
-              >
-                <span className={`area-dot area-${a.id}`} aria-hidden="true" />
-                {a.label}
-                <SeverityCounts findings={open.filter((f) => inView(f, a.id))} />
-              </a>
-            ))}
+            {areas.map((a) => {
+              const st = areaState(report, a.id)
+              return (
+                <a
+                  key={a.id}
+                  href={writeHash({
+                    ...filters,
+                    area: a.id,
+                    finding: undefined,
+                    rule: undefined,
+                    site: undefined,
+                  })}
+                  aria-current={a.id === filters.area ? 'page' : undefined}
+                  className="area"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    update({ area: a.id, finding: undefined, rule: undefined, site: undefined })
+                  }}
+                >
+                  <span
+                    className={`area-dot area-${a.id}${st === 'off' ? ' area-dot-off' : ''}`}
+                    aria-hidden="true"
+                  />
+                  {a.label}
+                  {st === 'off' ? (
+                    <span className="area-state">off</span>
+                  ) : st === 'dev' ? (
+                    <span className="area-state">greyed, dev server</span>
+                  ) : (
+                    <SeverityCounts findings={open.filter((f) => inView(f, a.id))} />
+                  )}
+                </a>
+              )
+            })}
           </nav>
           <span className="spacer" />
           <div className="filters" role="group" aria-label="Filters">
@@ -232,6 +286,9 @@ function Report({
         </div>
       </header>
 
+      {!report.baseline && report.config.checks && !report.running ? (
+        <FirstRun report={report} />
+      ) : null}
       <div className="layout">
         <Pages
           report={report}
@@ -240,7 +297,16 @@ function Report({
           update={update}
           inputRef={pageFilter}
         />
-        {filters.area === 'seo' && filters.site ? (
+        {state === 'off' ? (
+          <SwitchedOff area={filters.area} />
+        ) : passed ? (
+          <AreaPassed
+            report={report}
+            area={filters.area}
+            onKnown={() => update({ status: 'all', finding: undefined })}
+            onBrowse={() => setBrowsing([...browsing, filters.area])}
+          />
+        ) : filters.area === 'seo' && filters.site ? (
           <SiteView
             report={report}
             site={filters.site}
@@ -294,6 +360,7 @@ function Report({
               tab={tab}
               onTab={setTab}
               area={filters.area}
+              run={report.run}
             />
           </>
         ) : (
@@ -311,14 +378,32 @@ function RunFacts({ report }: { report: ReportJson }) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   })
   const seconds = Math.round(report.durationMs / 1000)
   const took = seconds >= 60 ? `${Math.floor(seconds / 60)} m ${seconds % 60} s` : `${seconds} s`
+  const run = report.run
+  const facts = [
+    run?.pr
+      ? `Pull request #${run.pr}`
+      : run?.channel && run.channel !== run.branch
+        ? run.channel
+        : run?.branch,
+    run?.commit,
+  ].filter(Boolean)
   return (
     <p className="run-facts">
-      <span>
-        {report.tool.name} {report.tool.version}
-      </span>
+      {run?.project ? <strong className="run-project">{run.project}</strong> : null}
+      {facts.map((f) => (
+        <span key={f} className="run-fact">
+          <span aria-hidden="true">·</span> {f}
+        </span>
+      ))}
+      {run ? null : (
+        <span>
+          {report.tool.name} {report.tool.version}
+        </span>
+      )}
       <span aria-hidden="true">·</span>
       <time dateTime={report.startedAt}>{when}</time>
       <span aria-hidden="true">·</span>
@@ -329,6 +414,24 @@ function RunFacts({ report }: { report: ReportJson }) {
 
 /** The run's result in one line, the same rule the exit code follows. */
 function Verdict({ report }: { report: ReportJson }) {
+  if (report.running) {
+    return (
+      <p className="verdict" role="status">
+        <span className="pill pill-running">Running</span>
+        <span>
+          Auditing {report.routes.length} of {plural(report.running.total, 'page')}
+        </span>
+        {/* A count, never a spinner: one segment per page, up to 30. */}
+        {report.running.total <= 30 ? (
+          <span className="run-progress" aria-hidden="true">
+            {Array.from({ length: report.running.total }, (_, i) => (
+              <span key={i} className={i < report.routes.length ? 'done' : undefined} />
+            ))}
+          </span>
+        ) : null}
+      </p>
+    )
+  }
   const open = report.routes.flatMap((r) => r.findings).filter((f) => !isKnown(f))
   const errors = open.filter((f) => f.severity === 'error')
   const warnings = open.filter((f) => f.severity === 'warn')
@@ -376,7 +479,24 @@ function Pages({
   const shown = report.routes
     .filter((r) => r.route.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => (perf ? lcp(b) - lcp(a) : 0))
-  const scoped = (r: RouteResult) => r.findings.filter((f) => inView(f, filters.area))
+  const scoped = (r: RouteResult) =>
+    r.findings.filter((f) => inView(f, filters.area) && (!filters.rule || f.rule === filters.rule))
+  // Above a few hundred findings, rules say more than a list of pages does.
+  const areaFindings = report.routes.flatMap((r) =>
+    r.findings.filter((f) => inView(f, filters.area)),
+  )
+  const group = filters.group ?? (areaFindings.length > GROUP_ABOVE ? 'rule' : 'page')
+  const byRule = [...new Set(areaFindings.map((f) => f.rule))]
+    .map((rule) => {
+      const fs = areaFindings.filter((f) => f.rule === rule)
+      return {
+        rule,
+        fs,
+        pages: new Set(fs.map((f) => f.route)).size,
+        fresh: fs.filter((f) => !isKnown(f)).length,
+      }
+    })
+    .sort((a, b) => b.fresh - a.fresh || b.fs.length - a.fs.length)
   const isClean = (r: RouteResult) => r.status === 'ok' && !worst(scoped(r))
   const clean = shown.filter(isClean)
   // The current page always stays in the list, even when its group is folded.
@@ -442,8 +562,68 @@ function Pages({
           </ul>
         </>
       ) : null}
-      <h2 className="overline">Pages · {report.routes.length}</h2>
-      <ul className="page-list">
+      {(byRule.length > 3 && areaFindings.length > GROUP_TOGGLE) || filters.group ? (
+        <div className="group-by">
+          <Segmented
+            label="Group by"
+            options={['page', 'rule'] as const}
+            value={group}
+            text={(g) => (g === 'page' ? 'Page' : 'Rule')}
+            onChange={(g) => update({ group: g })}
+          />
+        </div>
+      ) : null}
+      {group === 'rule' && byRule.length > 1 && !perf ? (
+        <>
+          <h2 className="overline">Rules · {byRule.length}</h2>
+          <ul className="group-list">
+            {byRule.map((g) => {
+              const sev = worst(g.fs) ?? g.fs[0]?.severity ?? 'info'
+              return (
+                <li key={g.rule}>
+                  <button
+                    type="button"
+                    aria-pressed={filters.rule === g.rule}
+                    onClick={() =>
+                      update({
+                        rule: filters.rule === g.rule ? undefined : g.rule,
+                        group: 'page',
+                        finding: undefined,
+                        route: g.fs.find((f) => !isKnown(f))?.route ?? g.fs[0]?.route,
+                      })
+                    }
+                  >
+                    <span className={`glyph sev-${sev}`} aria-hidden="true">
+                      {GLYPHS[sev]}
+                    </span>
+                    <span>
+                      <code>{g.rule}</code>{' '}
+                      <span className="muted">
+                        {g.fs.length.toLocaleString('en-US')} on {plural(g.pages, 'page')}
+                      </span>
+                    </span>
+                    <span className={`group-count${g.fresh ? ' strong' : ' muted'}`}>
+                      {g.fresh.toLocaleString('en-US')} new
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      ) : null}
+      {filters.rule && group === 'page' ? (
+        <p className="caption rule-scope">
+          Pages with <code>{filters.rule}</code>.{' '}
+          <button type="button" className="link" onClick={() => update({ rule: undefined })}>
+            All rules
+          </button>
+        </p>
+      ) : null}
+      <h2 className="overline" hidden={group === 'rule' && byRule.length > 1 && !perf}>
+        Pages · {report.routes.length}
+      </h2>
+      <ul className="page-list" hidden={group === 'rule' && byRule.length > 1 && !perf}>
         {listed.map((r) => {
           const open = scoped(r).filter((f) => !isKnown(f))
           const sev = worst(open)
@@ -501,7 +681,14 @@ function Pages({
             </button>
           </li>
         ) : null}
-        {shown.length === 0 ? <li className="page-none">No page matches “{query}”.</li> : null}
+        {report.running && report.running.total > report.routes.length ? (
+          <li className="page-none">
+            {plural(report.running.total - report.routes.length, 'page')} waiting
+          </li>
+        ) : null}
+        {shown.length === 0 && !report.running ? (
+          <li className="page-none">No page matches “{query}”.</li>
+        ) : null}
       </ul>
       {perf && report.performance ? (
         <p className="caption">Sorted by the slower of the two largest paints.</p>
@@ -558,9 +745,19 @@ function Pages({
           {report.config.viewport.w}×{report.config.viewport.h}
         </dd>
         <dt>Locales</dt>
-        <dd>{report.config.mode === 'rtl-only' ? 'Arabic only' : 'English → Arabic'}</dd>
+        <dd>
+          {report.config.mode === 'rtl-only'
+            ? 'Arabic only'
+            : (report.config.locale ?? 'English → Arabic')}
+        </dd>
         <dt>Baseline</dt>
-        <dd>{accepted ? `${accepted} accepted` : 'none yet'}</dd>
+        <dd>
+          {report.baseline
+            ? `${plural(report.baseline.entries, 'entry', 'entries')}, ${accepted} matched`
+            : accepted
+              ? `${accepted} accepted`
+              : 'none yet'}
+        </dd>
         <dt>Config</dt>
         <dd>
           <code>{report.config.hash.replace(/^\w+:/, '').slice(0, 6)}</code>

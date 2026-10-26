@@ -36,7 +36,10 @@ function scriptSafeJson(value: unknown) {
 export function writeHtmlReport(
   report: Report,
   outDir: string,
-  { maxInlineBytes = 25 * 1024 * 1024 } = {},
+  {
+    maxInlineBytes = 25 * 1024 * 1024,
+    dashboard = false,
+  }: { maxInlineBytes?: number; dashboard?: boolean } = {},
 ): { file: string; inlined: boolean } {
   const paths = [
     ...new Set(
@@ -56,14 +59,25 @@ export function writeHtmlReport(
       inlined ? `data:image/jpeg;base64,${readFileSync(join(outDir, p)).toString('base64')}` : p,
     ]),
   )
+  const file = join(outDir, 'report.html')
+  // While the audit runs, the page reloads itself to show the pages that finished.
+  writeViewer(
+    file,
+    { report, images, ...(dashboard ? { dashboardHref: 'dashboard.html' } : {}) },
+    report.running ? 3 : undefined,
+  )
+  return { file, inlined }
+}
+
+/** The viewer with this data filled in: a report, or the dashboard's runs. */
+export function writeViewer(file: string, data: unknown, refreshSeconds?: number) {
   const template = readFileSync(templatePath(), 'utf8')
   if (!PLACEHOLDER.test(template)) throw new Error('The report viewer has no data placeholder')
-  const html = template.replace(
+  let html = template.replace(
     PLACEHOLDER,
-    () =>
-      `<script type="application/json" id="miraya-data">${scriptSafeJson({ report, images })}</script>`,
+    () => `<script type="application/json" id="miraya-data">${scriptSafeJson(data)}</script>`,
   )
-  const file = join(outDir, 'report.html')
+  if (refreshSeconds)
+    html = html.replace('<head>', `<head><meta http-equiv="refresh" content="${refreshSeconds}">`)
   writeFileSync(file, html)
-  return { file, inlined }
 }

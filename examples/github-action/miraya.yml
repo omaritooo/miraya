@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  # For the summary comment on the pull request.
+  pull-requests: write
 
 jobs:
   miraya:
@@ -28,6 +30,12 @@ jobs:
       - run: npx wait-on http://localhost:3000
       # Annotations and the job summary are added automatically on GitHub Actions.
       - run: npx miraya audit
+      # One comment per pull request, edited on each push: new, fixed and known per area.
+      - uses: marocchino/sticky-pull-request-comment@v2
+        if: always() && hashFiles('.miraya/pr-comment.md') != ''
+        with:
+          header: miraya
+          path: .miraya/pr-comment.md
       - uses: actions/upload-artifact@v7
         if: always()
         with:

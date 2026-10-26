@@ -7,10 +7,12 @@ import AxeBuilder from '@axe-core/playwright'
 import { chromium, type Browser } from '@playwright/test'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  appendHistory,
   audit,
   exitCode,
   parseConfig,
   ReportSchema,
+  writeDashboard,
   writeHtmlReport,
   writeReport,
   type Report,
@@ -295,6 +297,57 @@ describe('HTML report', () => {
       await context.close()
     }
   })
+
+  it('builds the dashboard from two runs, compares them, and passes axe', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'miraya-dash-'))
+    const history = join(outDir, 'history')
+    const run = { project: 'fixtures', branch: 'main', commit: 'abc1234', channel: 'main' }
+    const first = await audit({
+      config: parseConfig({ ...config, checks: ['localization', 'seo'] }),
+      routes: ['/not-mirrored/good'],
+      browser,
+      outDir,
+      run,
+    })
+    first.startedAt = new Date(Date.parse(first.startedAt) - 8 * 864e5).toISOString()
+    appendHistory(first, history)
+    const second = await audit({
+      config: parseConfig({ ...config, checks: ['localization', 'seo'] }),
+      routes: ['/not-mirrored/good', '/not-mirrored/bad'],
+      browser,
+      outDir,
+      run: { ...run, commit: 'def5678' },
+    })
+    appendHistory(second, history)
+    writeHtmlReport(second, outDir, { dashboard: true })
+    const { file, runs } = writeDashboard(outDir, history, second)
+    expect(runs).toBe(2)
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    const page = await context.newPage()
+    try {
+      await page.goto(pathToFileURL(file).href)
+      await expect
+        .poll(() => page.getByRole('heading', { level: 1 }).textContent())
+        .toBe('3 new errors on main since last week')
+      expect(await page.locator('.card').count()).toBe(2) // localization and SEO
+      expect(await page.locator('.run-list li').count()).toBe(2)
+      const axe = await new AxeBuilder({ page }).analyze()
+      expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+      await page.getByRole('link', { name: 'Site views' }).click()
+      await expect.poll(() => page.locator('.site-group').count()).toBe(1)
+      const siteAxe = await new AxeBuilder({ page }).analyze()
+      expect(siteAxe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+      // The newest run's "Open report" goes to report.html, which links back.
+      await page.getByRole('link', { name: 'Overview' }).click()
+      await page
+        .getByRole('link', { name: /^Open report/ })
+        .first()
+        .click()
+      await expect.poll(() => page.getByRole('link', { name: 'Open in dashboard' }).count()).toBe(1)
+    } finally {
+      await context.close()
+    }
+  })
 })
 
 describe('crawl and the CLI', () => {
@@ -328,6 +381,9 @@ describe('crawl and the CLI', () => {
     expect(run.stdout).toContain('not-mirrored')
     expect(existsSync(join(dir, '.miraya/report.json'))).toBe(true)
     expect(existsSync(join(dir, '.miraya/report.html'))).toBe(true)
+    // Each run adds to the history, and the dashboard is rebuilt from it.
+    expect(readdirSync(join(dir, '.miraya-history'))).toHaveLength(1)
+    expect(existsSync(join(dir, '.miraya/dashboard.html'))).toBe(true)
   })
 })
 

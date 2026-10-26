@@ -107,14 +107,14 @@ export function CrossStage({
 }
 
 /** Findings on each page in each engine, in the areas every engine checks. */
-function ByEngine({
+export function ByEngine({
   report,
   engines,
   current,
 }: {
   report: Report
   engines: Engine[]
-  current: RouteResult
+  current?: RouteResult
 }) {
   const [main] = engines
   const count = (r: RouteResult, e: Engine) =>
@@ -128,12 +128,13 @@ function ByEngine({
         ? r.engines[e].findings
         : undefined
   return (
-    <section className="by-engine" aria-labelledby="by-engine-title">
-      <h2 id="by-engine-title" className="seo-h2">
-        Findings by engine
-      </h2>
-      <div className="table-box">
-        <table className="evidence">
+    <section className="panel by-engine" aria-labelledby="by-engine-title">
+      <div className="panel-head">
+        <h2 id="by-engine-title">Pages × engines</h2>
+        <span className="muted">Findings in localization and SEO, by engine</span>
+      </div>
+      <div className="table-box table-flush">
+        <table className="evidence engine-table">
           <thead>
             <tr>
               <th scope="col">Page</th>
@@ -147,7 +148,7 @@ function ByEngine({
           <tbody>
             {report.routes.map((r) => {
               const counts = engines.map((e) => count(r, e))
-              const differs = new Set(counts.filter((c) => c !== undefined)).size > 1
+              const base = counts[0]
               return (
                 <tr key={r.route} aria-current={r === current ? 'true' : undefined}>
                   <th scope="row">
@@ -155,11 +156,23 @@ function ByEngine({
                       <code>{r.route}</code>
                     </bdi>
                   </th>
-                  {counts.map((c, i) => (
-                    <td key={engines[i]} className={differs ? 'differs' : undefined}>
-                      {c ?? <span className="muted">failed</span>}
-                    </td>
-                  ))}
+                  {counts.map((c, i) => {
+                    const extra = i > 0 && c !== undefined && base !== undefined ? c - base : 0
+                    return (
+                      <td key={engines[i]} className={extra > 0 ? 'cell-warn' : undefined}>
+                        {c === undefined ? (
+                          <span className="muted">failed</span>
+                        ) : extra > 0 ? (
+                          <span className="sev-warn strong">
+                            <span aria-hidden="true">▲</span> {c}{' '}
+                            <span className="extra">+{extra} only here</span>
+                          </span>
+                        ) : (
+                          c
+                        )}
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
@@ -167,7 +180,7 @@ function ByEngine({
         </table>
       </div>
       {engines.some((e) => e !== 'chromium') ? (
-        <p className="caption">
+        <p className="panel-foot caption">
           Firefox and WebKit skip <code>fallback-font</code>, which needs Chromium, so they can show
           fewer findings without a difference.
         </p>

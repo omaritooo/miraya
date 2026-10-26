@@ -93,3 +93,27 @@ export function updateBaseline(baseline: Baseline | undefined, report: Report): 
   }
   return { schemaVersion: 1, entries: [...kept, ...current].sort(byRouteRuleFingerprint) }
 }
+
+/**
+ * Accepts single findings from a report, by fingerprint, leaving the rest of the baseline
+ * alone. Returns the fingerprints the report didn't have, so a typo isn't silently ignored.
+ */
+export function acceptFindings(
+  baseline: Baseline | undefined,
+  report: Report,
+  fingerprints: string[],
+): { baseline: Baseline; missing: string[] } {
+  const entries = [...(baseline?.entries ?? [])]
+  const have = new Set(entries.map((e) => e.fingerprint))
+  const findings = new Map(report.routes.flatMap((r) => r.findings).map((f) => [f.id, f]))
+  const missing: string[] = []
+  for (const id of fingerprints) {
+    const f: Finding | undefined = findings.get(id)
+    if (!f) missing.push(id)
+    else if (!have.has(id)) {
+      have.add(id)
+      entries.push({ fingerprint: id, rule: f.rule, route: f.route })
+    }
+  }
+  return { baseline: { schemaVersion: 1, entries: entries.sort(byRouteRuleFingerprint) }, missing }
+}

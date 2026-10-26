@@ -1,7 +1,13 @@
 export * from './types'
 export {
+  acceptFindings,
+  appendHistory,
   applyBaseline,
   audit,
+  detectRun,
+  historyRun,
+  readHistory,
+  writeDashboard,
   readBaseline,
   updateBaseline,
   writeBaseline,

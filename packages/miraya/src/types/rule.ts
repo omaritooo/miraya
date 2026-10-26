@@ -27,7 +27,7 @@ export type RuleMeta = {
 
 export type FindingInput = Omit<
   Finding,
-  'id' | 'area' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved' | 'engines'
+  'id' | 'area' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved' | 'engines' | 'label' | 'text'
 > & {
   /** Defaults to the resolved severity. A rule may lower it, never raise it. */
   severity?: Severity

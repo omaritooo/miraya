@@ -14,8 +14,23 @@ export { detectProject, renderConfig, type Detected } from './init'
 export { signIn, writeSession, type SignInOptions } from './login'
 export { answers, startServer, type Server } from './server'
 export { consistent, pairSnapshots, type PairingStats } from './pair'
-export { applyBaseline, readBaseline, updateBaseline, writeBaseline } from './baseline'
+export {
+  acceptFindings,
+  applyBaseline,
+  readBaseline,
+  updateBaseline,
+  writeBaseline,
+} from './baseline'
+export {
+  appendHistory,
+  historyRun,
+  readHistory,
+  writeDashboard,
+  type DashboardData,
+} from './history'
+export { describe } from './engine'
+export { detectRun, githubRepo } from './run'
 export { crawl, normaliseLink } from './crawl'
-export { githubAnnotations, githubSummary, writeGithubOutput } from './github'
+export { githubAnnotations, githubComment, githubSummary, writeGithubOutput } from './github'
 export { routeSlug } from './render'
 export { builtinRules } from '../rules'

@@ -1,5 +1,6 @@
 import { appendFileSync } from 'node:fs'
-import type { Finding, Report, Severity } from '../types'
+import { builtinRules } from '../rules'
+import type { Area, Finding, Report, Severity } from '../types'
 
 /** GitHub's per-step limits for each annotation type (as documented when this was written). */
 const PER_TYPE = 10
@@ -88,6 +89,82 @@ export function githubSummary(report: Report): string {
       `${report.fixed.length} baseline entries are fixed; run \`miraya baseline update\` to prune them.`,
       '',
     )
+  return out.join('\n')
+}
+
+const GLYPH: Record<Severity, string> = { error: '◆', warn: '▲', info: '●' }
+const AREA_NAMES: Record<Area, string> = {
+  localization: 'Localization',
+  seo: 'SEO',
+  performance: 'Performance',
+}
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+const firstSentence = (s: string) => {
+  const m = /^.*?[.!?](?=\s|$)/.exec(s)
+  const one = (m?.[0] ?? s).replace(/\.$/, '')
+  return `${one[0]?.toLowerCase()}${one.slice(1)}`
+}
+
+/**
+ * The pull request comment: the verdict, new, fixed and known per area, and the new
+ * findings, most severe first. Written to pr-comment.md for a sticky-comment step to post.
+ */
+export function githubComment(report: Report): string {
+  const all = report.routes.flatMap((r) => r.findings)
+  const fresh = all.filter((f) => f.status !== 'baselined')
+  const errors = fresh.filter((f) => f.severity === 'error')
+  const failed = report.routes.filter((r) => r.status === 'error').length
+  const area = (rule: string) =>
+    builtinRules.find((r) => r.meta.id === rule)?.meta.area ?? 'localization'
+  const headline = errors.length
+    ? `${plural(errors.length, 'new error')} on ${plural(new Set(errors.map((f) => f.route)).size, 'page')}`
+    : fresh.length
+      ? `no new errors, ${plural(fresh.length, 'new finding')}`
+      : 'nothing new'
+  const out = [
+    `### Miraya: ${headline}`,
+    '',
+    '| Area | New | Fixed | Known |',
+    '| --- | --: | --: | --: |',
+  ]
+  const dev = report.routes.some((r) => r.perf?.rtl?.devServer || r.perf?.ltr?.devServer)
+  for (const id of report.config.checks ?? ['localization']) {
+    if (id === 'performance' && dev) {
+      out.push(`| ${AREA_NAMES[id]} | skipped, dev server | | |`)
+      continue
+    }
+    const mine = fresh.filter((f) => (f.area ?? 'localization') === id)
+    const sev = (['error', 'warn', 'info'] as const).find((s) => mine.some((f) => f.severity === s))
+    const known = all.filter((f) => (f.area ?? 'localization') === id && f.status === 'baselined')
+    const fixed = report.fixed.filter((f) => area(f.rule) === id)
+    out.push(
+      `| ${AREA_NAMES[id]} | ${sev ? `${GLYPH[sev]} ` : ''}${mine.length} | ${fixed.length} | ${known.length} |`,
+    )
+  }
+  // One line per rule and message, so copies of one component read as one problem.
+  const groups = new Map<string, Finding[]>()
+  for (const f of [...fresh].sort((a, b) => RANK[a.severity] - RANK[b.severity])) {
+    const key = `${f.rule}\u0000${f.label ?? f.selector}`
+    groups.set(key, [...(groups.get(key) ?? []), f])
+  }
+  const lines = [...groups.values()].slice(0, 10).map((g) => {
+    const f = g[0] as Finding
+    const pages = [...new Set(g.map((x) => x.route))]
+    const where = pages.length > 1 ? plural(pages.length, 'page') : `\`${f.route}\``
+    const hint = f.sourceHint
+      ? ` \`${f.sourceHint.replace(/^.*\//, '').replace(/:\d+$/, '')}\``
+      : ''
+    return `- ${GLYPH[f.severity]} **${f.rule}** on ${where}: ${cell(firstSentence(f.message))}.${hint}`
+  })
+  if (lines.length) out.push('', ...lines)
+  if (groups.size > 10) out.push(`- and ${plural(groups.size - 10, 'more')} in the report`)
+  const tail = [
+    report.run?.url
+      ? `[Open the full report](${report.run.url})`
+      : 'The full report is in the run artifact',
+    failed ? `${plural(failed, 'page')} couldn't be audited` : '',
+  ].filter(Boolean)
+  out.push('', tail.join(' · '))
   return out.join('\n')
 }
 

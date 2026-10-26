@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { EngineSchema, FindingSchema } from './finding'
+import { AreaSchema, EngineSchema, FindingSchema } from './finding'
 import { PageHeadSchema, PagePerfSchema } from './snapshot'
 
 const FixedEntrySchema = z.object({ fingerprint: z.string(), rule: z.string(), route: z.string() })
@@ -79,6 +79,21 @@ export const RouteResultSchema = z.object({
 })
 export type RouteResult = z.infer<typeof RouteResultSchema>
 
+export const RunInfoSchema = z.object({
+  /** The package name, or the folder's. */
+  project: z.string().optional(),
+  branch: z.string().optional(),
+  commit: z.string().optional(),
+  pr: z.number().int().optional(),
+  /** Groups runs on the dashboard: "main", "Pull requests" or a name like "Production nightly". */
+  channel: z.string().optional(),
+  /** The CI run, where its report can be downloaded. */
+  url: z.string().optional(),
+  /** owner/repo on GitHub, for "Create issue". */
+  repo: z.string().optional(),
+})
+export type RunInfo = z.infer<typeof RunInfoSchema>
+
 /** report.json, the public output contract (ADR-004). */
 export const ReportSchema = z.object({
   schemaVersion: z.literal(1),
@@ -89,7 +104,17 @@ export const ReportSchema = z.object({
     hash: z.string(),
     viewport: z.object({ w: z.number().int(), h: z.number().int() }),
     mode: z.enum(['pair', 'rtl-only']),
+    /** The areas switched on. Absent in reports from before 0.4. */
+    checks: z.array(AreaSchema).optional(),
+    /** How the languages were switched, in words: "by /ar prefix". */
+    locale: z.string().optional(),
   }),
+  /** Where the run came from, for the header and the dashboard. */
+  run: RunInfoSchema.optional(),
+  /** The baseline the findings were compared with. Absent on a first run, or with baselines off. */
+  baseline: z.object({ entries: z.number().int() }).optional(),
+  /** Present while the audit is still going: report.html is rewritten as pages finish. */
+  running: z.object({ total: z.number().int() }).optional(),
   summary: z.object({
     routes: z.number().int(),
     routeErrors: z.number().int(),

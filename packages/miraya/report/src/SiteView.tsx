@@ -36,15 +36,12 @@ export function SiteView({
   const audited = report.routes.filter((r) => r.head?.rtl)
   return (
     <main className="stage site" id="site-view" tabIndex={-1} aria-label={view.label}>
-      <div className="stage-head">
-        <h1>{view.label}</h1>
-        <span className="muted">{plural(audited.length, 'page')} · English and Arabic</span>
-      </div>
-      <div className="seo-body">
+      <div className="seo-body site-body">
+        <p className="sr">{plural(audited.length, 'page')} · English and Arabic</p>
         {site === 'titles' ? (
-          <Titles report={report} rules={view.rules} onOpen={onOpen} />
+          <Titles report={report} rules={view.rules} onOpen={onOpen} level={1} />
         ) : (
-          <Links report={report} rules={view.rules} onOpen={onOpen} />
+          <Links report={report} rules={view.rules} onOpen={onOpen} level={1} />
         )}
       </div>
     </main>
@@ -84,14 +81,17 @@ function PageLink({
   )
 }
 
-function Titles({
+export function Titles({
   report,
   rules,
   onOpen,
+  level = 2,
 }: {
   report: Report
   rules: string[]
   onOpen: (route: string, finding?: string) => void
+  /** 1 where the table is the page's main content. */
+  level?: 1 | 2
 }) {
   const [dir, setDir] = useState<Dir>('rtl')
   const [all, setAll] = useState(false)
@@ -105,12 +105,29 @@ function Titles({
     return dup(b) - dup(a) || title(a).localeCompare(title(b))
   })
   const groups = new Set<string>()
-  const lengthFlag = (r: RouteResult, rule: string, check?: string) =>
+  const flagOf = (r: RouteResult, rule: string, check?: string) =>
     open(r, [rule]).find((f) => onSide(f, dir) && (!check || f.evidence.check === check))
+  const dupGroups = new Set(pages.filter((r) => flagOf(r, 'duplicate-title', 'title')).map(title))
+    .size
+  const longDescriptions = pages.filter(
+    (r) => flagOf(r, 'meta-description')?.evidence.check === 'long',
+  ).length
+  const Heading = level === 1 ? 'h1' : 'h2'
 
   return (
-    <>
-      <div className="site-tools">
+    <section className="panel" aria-labelledby="titles-title">
+      <div className="panel-head">
+        <Heading id="titles-title">Titles and descriptions</Heading>
+        <span className="muted">
+          {[
+            plural(pages.length, 'page'),
+            dupGroups ? plural(dupGroups, 'duplicate group') : '',
+            longDescriptions ? `${plural(longDescriptions, 'description')} too long` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+        <span className="spacer" />
         <Segmented
           label="Language"
           options={['ltr', 'rtl'] as const}
@@ -118,26 +135,23 @@ function Titles({
           text={(d) => LANGUAGE[d]}
           onChange={setDir}
         />
-        <span className="muted">
-          {plural(flagged.length, 'page')} with findings in {LANGUAGE[dir]}
-        </span>
       </div>
-      <div className="table-box">
+      <div className="table-box table-flush">
         <table className="evidence site-table">
           <caption className="sr">Titles and descriptions in {LANGUAGE[dir]}</caption>
           <thead>
             <tr>
               <th scope="col">Page</th>
               <th scope="col">Title</th>
-              <th scope="col">Length</th>
+              <th scope="col">Title length</th>
               <th scope="col">Description</th>
-              <th scope="col">Length</th>
+              <th scope="col">Description length</th>
             </tr>
           </thead>
-          <tbody {...(dir === 'rtl' ? { lang: 'ar' } : {})}>
+          <tbody>
             {sorted.flatMap((r) => {
               const head = r.head?.[dir]
-              const dup = lengthFlag(r, 'duplicate-title', 'title')
+              const dup = flagOf(r, 'duplicate-title', 'title')
               const key = title(r)
               const rows: ReactNode[] = []
               if (dup && !groups.has(key)) {
@@ -145,7 +159,7 @@ function Titles({
                 const count = Number(dup.evidence.pages) || 2
                 rows.push(
                   <tr key={`group-${key}`} className="site-group">
-                    <th scope="rowgroup" colSpan={5} lang="en">
+                    <th scope="rowgroup" colSpan={5}>
                       <Flag finding={dup}>
                         Same title on {plural(count, 'page')}: “<bdi>{head?.title}</bdi>”
                       </Flag>
@@ -153,36 +167,39 @@ function Titles({
                   </tr>,
                 )
               }
-              const titleFlag = lengthFlag(r, 'page-title')
-              const descFlag = lengthFlag(r, 'meta-description')
+              const titleFlag = flagOf(r, 'page-title')
+              const descFlag = flagOf(r, 'meta-description')
+              const lang = dir === 'rtl' ? { lang: 'ar', dir: 'rtl' } : {}
               rows.push(
                 <tr key={r.route}>
-                  <th scope="row" lang="en">
+                  <th scope="row">
                     <PageLink route={r} onOpen={onOpen} />
                   </th>
-                  <td dir={dir}>
+                  <td>
                     {head?.title ? (
-                      <bdi>{head.title}</bdi>
+                      <bdi {...lang}>{head.title}</bdi>
                     ) : (
-                      <span lang="en" dir="ltr">
-                        <Flag finding={titleFlag}>missing</Flag>
-                      </span>
+                      <Flag finding={titleFlag}>missing</Flag>
                     )}
                   </td>
-                  <td lang="en">
-                    <Flag finding={titleFlag}>{head?.title?.length ?? 0}</Flag>
+                  <td>
+                    <LengthBar
+                      length={head?.title?.length ?? 0}
+                      max={Number(titleFlag?.evidence.max) || 60}
+                      flag={titleFlag}
+                    />
                   </td>
-                  <td dir={dir}>
+                  <td>
                     {head?.description ? (
-                      <bdi className="clamp">{head.description}</bdi>
+                      <bdi className="clamp" {...lang}>
+                        {head.description}
+                      </bdi>
                     ) : (
-                      <span lang="en" dir="ltr">
-                        <Flag finding={descFlag}>missing</Flag>
-                      </span>
+                      <Flag finding={descFlag}>missing</Flag>
                     )}
                   </td>
-                  <td lang="en">
-                    <Flag finding={descFlag}>{head?.description?.length ?? 0}</Flag>
+                  <td>
+                    <LengthNote length={head?.description?.length ?? 0} flag={descFlag} />
                   </td>
                 </tr>,
               )
@@ -190,27 +207,59 @@ function Titles({
             })}
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={5} lang="en">
-                  No title or description findings in {LANGUAGE[dir]}.
-                </td>
+                <td colSpan={5}>No title or description findings in {LANGUAGE[dir]}.</td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
       {pages.length > flagged.length ? (
-        <button
-          type="button"
-          className="link site-more"
-          aria-expanded={all}
-          onClick={() => setAll(!all)}
-        >
-          {all
-            ? 'Only pages with findings'
-            : `Show ${plural(pages.length - flagged.length, 'page')} with no findings`}
-        </button>
+        <div className="panel-foot">
+          <button
+            type="button"
+            className="link site-more"
+            aria-expanded={all}
+            onClick={() => setAll(!all)}
+          >
+            {all
+              ? 'Only pages with findings'
+              : `Show ${plural(pages.length - flagged.length, 'page')} with no findings`}
+          </button>
+        </div>
       ) : null}
-    </>
+    </section>
+  )
+}
+
+/** A title's length as a short bar, coloured when it's over or under the rule's limits. */
+function LengthBar({ length, max, flag }: { length: number; max: number; flag?: Finding }) {
+  const width = Math.min(1, length / max) * 60
+  return (
+    <span className="length">
+      <span className={`length-bar${flag ? ' length-off' : ''}`} aria-hidden="true">
+        <span style={{ inlineSize: `${width}px` }} />
+      </span>
+      <LengthNote length={length} flag={flag} />
+    </span>
+  )
+}
+
+/** "182, 22 over" or "35, under 50": the number, and what's wrong with it. */
+function LengthNote({ length, flag }: { length: number; flag?: Finding }) {
+  if (!flag) return <span className="num">{length}</span>
+  const { check, max, min } = flag.evidence
+  const note =
+    check === 'missing'
+      ? 'none'
+      : check === 'long' && typeof max === 'number'
+        ? `${length}, ${length - max} over`
+        : check === 'short' && typeof min === 'number'
+          ? `${length}, under ${min}`
+          : String(length)
+  return (
+    <span className="num">
+      <Flag finding={flag}>{note}</Flag>
+    </span>
   )
 }
 
@@ -236,6 +285,7 @@ function LinkCell({
       <td>
         <span className="pos">
           <span aria-hidden="true">✓</span> {ok}
+          {ok ? null : <span className="sr">fine</span>}
         </span>
       </td>
     )
@@ -245,7 +295,7 @@ function LinkCell({
       ? ''
       : ` (${first.evidence.side === 'ltr' ? 'en' : 'ar'})`
   return (
-    <td>
+    <td className={`cell-${first.severity}`}>
       <span className={`sev-${first.severity}`} title={first.message}>
         <span aria-hidden="true">{GLYPHS[first.severity]}</span>{' '}
         {String(first.evidence.check).replace(/-/g, ' ')}
@@ -255,23 +305,28 @@ function LinkCell({
   )
 }
 
-function Links({
+export function Links({
   report,
   rules,
   onOpen,
+  level = 2,
 }: {
   report: Report
   rules: string[]
   onOpen: (route: string, finding?: string) => void
+  level?: 1 | 2
 }) {
   const pair = report.config.mode === 'pair'
+  const Heading = level === 1 ? 'h1' : 'h2'
   return (
-    <>
-      <p className="caption">
-        Does each page link to its twin in the other language, and does the twin link back? Hover a
-        finding for its message; open the page for details.
-      </p>
-      <div className="table-box">
+    <section className="panel" aria-labelledby="links-title">
+      <div className="panel-head">
+        <Heading id="links-title">Language links</Heading>
+        <span className="muted">
+          Does each page point at its twin, and does the twin point back?
+        </span>
+      </div>
+      <div className="table-box table-flush">
         <table className="evidence site-table">
           <caption className="sr">Language links</caption>
           <thead>
@@ -344,7 +399,10 @@ function Links({
           </tbody>
         </table>
       </div>
-    </>
+      <p className="panel-foot caption">
+        Hover a finding for its message; open the page for details.
+      </p>
+    </section>
   )
 }
 

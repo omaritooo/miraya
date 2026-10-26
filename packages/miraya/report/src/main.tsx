@@ -2,11 +2,11 @@ import './styles.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import type { ReportData } from './data'
+import type { ViewerData } from './data'
 
 const data = JSON.parse(
   document.getElementById('miraya-data')?.textContent ?? 'null',
-) as ReportData | null
+) as ViewerData | null
 const root = document.getElementById('root')
 if (root) {
   createRoot(root).render(

@@ -20,6 +20,10 @@ export const FindingSchema = z.object({
   severity: SeveritySchema,
   route: z.string(),
   selector: z.string(),
+  /** What the element is, in words: "Sign in link". Absent for page-level findings. */
+  label: z.string().optional(),
+  /** The element's English text, when it has some. */
+  text: z.string().optional(),
   boxes: z.object({ ltr: BoxSchema.optional(), rtl: BoxSchema.optional() }),
   message: z.string(),
   docsUrl: z.string(),

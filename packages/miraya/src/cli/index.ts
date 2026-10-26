@@ -6,8 +6,13 @@ import type { Browser } from '@playwright/test'
 import { Command, Option } from 'commander'
 import pkg from '../../package.json'
 import {
+  acceptFindings,
+  appendHistory,
   audit,
   builtinRules,
+  detectRun,
+  githubComment,
+  writeDashboard,
   ConfigError,
   crawl,
   detectProject,
@@ -242,6 +247,7 @@ program
   .option('--allow-errors', "route errors don't force exit code 2")
   .option('--headed', 'show the browser')
   .option('--no-open', "don't open the HTML report when the audit ends")
+  .option('--channel <name>', 'groups runs on the dashboard, like "Production nightly"')
   .action((opts) => runAudit(opts))
 
 type AuditCliOptions = CommonOptions & {
@@ -257,6 +263,7 @@ type AuditCliOptions = CommonOptions & {
   allowErrors?: boolean
   headed?: boolean
   open?: boolean
+  channel?: string
 }
 
 const AUDIT_DEFAULTS = { out: '.miraya', format: 'json,html', open: true }
@@ -276,8 +283,24 @@ async function runAudit(opts: AuditCliOptions) {
   const loaded = await loadCliConfig(opts)
   if (opts.checks) loaded.config.checks = parseChecks(opts.checks)
   const { config } = loaded
+  const formats = new Set(
+    String(opts.format)
+      .split(',')
+      .map((f) => f.trim()),
+  )
+  if (process.env.GITHUB_ACTIONS === 'true') formats.add('github')
+  const live = (partial: Report) => {
+    // report.html fills in as pages finish; open it to watch the run.
+    try {
+      writeHtmlReport(partial, opts.out, { maxInlineBytes: config.report.maxInlineBytes })
+    } catch {
+      // A live view is a convenience; the final write reports real errors.
+    }
+  }
   const report = await withApp(loaded, { headless: !opts.headed }, async (browser) =>
     audit({
+      run: detectRun({ ...(opts.channel ? { channel: opts.channel } : {}), cwd: loaded.dir }),
+      ...(formats.has('html') ? { onProgress: live } : {}),
       config,
       routes: await routesFor(opts, config, browser),
       outDir: opts.out,
@@ -289,31 +312,88 @@ async function runAudit(opts: AuditCliOptions) {
       ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
     }),
   )
-  const formats = new Set(
-    String(opts.format)
-      .split(',')
-      .map((f) => f.trim()),
-  )
-  if (process.env.GITHUB_ACTIONS === 'true') formats.add('github')
   const json = writeReport(report, opts.out)
   printSummary(report)
   out(`Report: ${json}`)
   if (formats.has('html')) {
     const html = writeHtmlReport(report, opts.out, {
       maxInlineBytes: config.report.maxInlineBytes,
+      dashboard: config.history !== false,
     })
     out(
       `        ${pathToFileURL(html.file).href}${html.inlined ? '' : ' (screenshots referenced, not inlined: keep the routes/ folder with it)'}`,
     )
     if (opts.open !== false && interactive()) openFile(resolve(html.file))
   }
-  if (formats.has('github')) writeGithubOutput(report)
+  if (config.history !== false) {
+    const dir = resolve(loaded.dir, config.history)
+    appendHistory(report, dir)
+    const dashboard = writeDashboard(opts.out, dir, report)
+    out(`Dashboard: ${pathToFileURL(dashboard.file).href} (${dashboard.runs} runs)`)
+  }
+  if (formats.has('github')) {
+    writeGithubOutput(report)
+    writeFileSync(join(opts.out, 'pr-comment.md'), `${githubComment(report)}\n`)
+  }
   process.exitCode = exitCode(report, { allowErrors: !!opts.allowErrors })
 }
+
+program
+  .command('dashboard')
+  .description('Write dashboard.html from the run history, to compare runs over time.')
+  .option('-c, --config <path>', 'config file, for the history folder')
+  .option('--history <dir>', 'history folder (default: config.history)')
+  .option('-o, --out <dir>', 'output folder', '.miraya')
+  .option('--no-open', "don't open the dashboard")
+  .action(async (opts: { config?: string; history?: string; out: string; open?: boolean }) => {
+    let dir = opts.history
+    let base = process.cwd()
+    if (!dir) {
+      const loaded = await loadCliConfig(opts)
+      if (loaded.config.history === false)
+        throw new ConfigError('History is switched off in the config (history: false)')
+      dir = loaded.config.history
+      base = loaded.dir
+    }
+    const latestPath = join(opts.out, 'report.json')
+    const latest = existsSync(latestPath)
+      ? ReportSchema.safeParse(JSON.parse(readFileSync(latestPath, 'utf8')))
+      : undefined
+    const { file, runs } = writeDashboard(
+      opts.out,
+      resolve(base, dir),
+      latest?.success ? latest.data : undefined,
+    )
+    if (!runs) err(`No runs in ${dir} yet: run \`miraya audit\` first.`)
+    out(`Dashboard: ${pathToFileURL(file).href} (${runs} runs)`)
+    if (opts.open !== false && interactive()) openFile(resolve(file))
+  })
 
 const baseline = program
   .command('baseline')
   .description('Manage the baseline of accepted findings.')
+baseline
+  .command('accept')
+  .description('Accept single findings from the last report, by fingerprint.')
+  .argument('<fingerprint...>', 'fingerprints, as the report shows them')
+  .option('-c, --config <path>', 'config file')
+  .option('--report <path>', 'report to read', '.miraya/report.json')
+  .action(async (fingerprints: string[], opts: { config?: string; report: string }) => {
+    const { config } = await loadCliConfig(opts)
+    if (config.baseline === false)
+      throw new ConfigError('Baselines are switched off in the config (baseline: false)')
+    if (!existsSync(opts.report))
+      throw new ConfigError(`No report at ${opts.report}: run \`miraya audit\` first`)
+    const report = ReportSchema.parse(JSON.parse(readFileSync(opts.report, 'utf8')))
+    const path = resolve(config.baseline)
+    const { baseline: next, missing } = acceptFindings(readBaseline(path), report, fingerprints)
+    if (missing.length)
+      throw new ConfigError(`Not in ${opts.report}: ${missing.join(', ')}. Nothing was accepted.`)
+    writeBaseline(path, next)
+    out(
+      `Accepted ${fingerprints.length} finding${fingerprints.length === 1 ? '' : 's'} into ${path}.`,
+    )
+  })
 baseline
   .command('update')
   .description('Accept the current findings. Only the audited routes are replaced; notes are kept.')

@@ -231,6 +231,7 @@ export function routeSummary(findings: Finding[], durationMs: number): string {
 export function elementLabel(finding: Finding): string {
   const side = finding.evidence.side
   if (typeof side === 'string' && SIDE_WORDS[side]) return SIDE_WORDS[side]
+  if (finding.label) return finding.label
   const text = finding.evidence.text
   if (typeof text === 'string' && text.trim()) return text.trim()
   return finding.selector.split(/\s*>\s*/).at(-1) ?? finding.selector

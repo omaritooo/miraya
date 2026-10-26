@@ -139,6 +139,11 @@ export const ConfigSchema = z.object({
   /** Opt-in experimental rule ids. */
   experimental: z.array(z.string()).default([]),
   baseline: z.union([z.string(), z.literal(false)]).default('.miraya-baseline.json'),
+  /**
+   * A folder that keeps a short summary of every run, for the dashboard. Commit it, or keep
+   * it in CI's cache, to compare runs over time. false keeps no history.
+   */
+  history: z.union([z.string(), z.literal(false)]).default('.miraya-history'),
   report: z.object({ maxInlineBytes: z.number().default(25 * 1024 * 1024) }).prefault({}),
 })
 export type ConfigInput = z.input<typeof ConfigSchema>

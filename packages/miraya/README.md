@@ -91,6 +91,7 @@ Everything except `baseUrl` is optional.
 | `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                                                           |
 | `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                                                        |
 | `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                                                    |
+| `history`                 | `'.miraya-history'`         | A folder that keeps a short summary of every run, for the dashboard. `false` keeps no history. See [Dashboard](#dashboard).                                                                                         |
 
 The config can be `miraya.config.ts`, `.mts`, `.js` or `.mjs`. `defineConfig` gives you types and autocomplete. JSON Schemas for the report and the baseline ship in `@miraya/cli/schema/`.
 
@@ -106,6 +107,8 @@ npx miraya audit -r /pricing         # just this route
 npx miraya audit --crawl             # find routes by following links
 npx miraya audit --rule not-mirrored # just this rule
 npx miraya baseline update           # accept the current findings
+npx miraya baseline accept 3b390ba0bb # accept one finding from the last report
+npx miraya dashboard                 # compare runs over time in dashboard.html
 npx miraya explain 3b390ba0          # the measurements behind one finding
 npx miraya rules                     # list the rules
 ```
@@ -136,7 +139,9 @@ Adopting Miraya on an existing app usually turns up findings you can't fix today
 npx miraya baseline update
 ```
 
-This writes `.miraya-baseline.json`. Commit it. From then on, accepted findings show as "known" in the report and don't fail the run; only new ones do. When you fix one, the report lists it as fixed. Findings are matched by what they are, not where they are, so moving an element doesn't make its finding new.
+This writes `.miraya-baseline.json`. Commit it. To accept one finding instead, use the command the report's "Accept into baseline" button copies: `npx miraya baseline accept <fingerprint>`.
+
+Until there's a baseline, the report says so and every finding shows as new. From then on, accepted findings show as "known" in the report and don't fail the run; only new ones do. When you fix one, the report lists it as fixed. Findings are matched by what they are, not where they are, so moving an element doesn't make its finding new.
 
 ## Translation files
 
@@ -187,9 +192,21 @@ test('checkout has no RTL bugs', async ({ page }) => {
 })
 ```
 
+## Dashboard
+
+Every audit adds a small summary of the run (counts and fingerprints, no screenshots) to `.miraya-history/` and writes `.miraya/dashboard.html` next to the report. The dashboard compares runs:
+
+- **Overview**: new errors since last week or the previous run, health per area with a trend, what's new and what's fixed, the worst pages, and recent runs.
+- **Runs**, **Pages** and **Trends**: the full lists, and 30 or 90 days of findings per area.
+- **Site views**: every page's titles and descriptions, how the languages link to each other, and findings per engine, from the newest run.
+
+Runs are grouped by where they came from: the branch, "Pull requests", or a name you pass with `--channel "Production nightly"`. Commit the history folder, or keep it in your CI cache, to compare runs over time. `npx miraya dashboard` rebuilds the page from the folder.
+
+The report itself fills in while the audit runs: open `.miraya/report.html` during a long run to see the pages that are done.
+
 ## GitHub Actions
 
-Copy [`examples/github-action/miraya.yml`](https://github.com/omaritooo/miraya/blob/main/examples/github-action/miraya.yml) into `.github/workflows/`. On GitHub Actions, findings appear as annotations on the pull request and in the job summary, and the HTML report is uploaded as an artifact.
+Copy [`examples/github-action/miraya.yml`](https://github.com/omaritooo/miraya/blob/main/examples/github-action/miraya.yml) into `.github/workflows/`. On GitHub Actions, findings appear as annotations on the pull request and in the job summary, and the HTML report is uploaded as an artifact. Miraya also writes `.miraya/pr-comment.md`: the verdict, new, fixed and known findings per area, and the new findings in a list. Post it with a sticky-comment step so the pull request has one comment that's edited on each push.
 
 The example serves the production build itself, so the `server` command in your config isn't run: an app that's already answering at `baseUrl` is used as it is. Run it in the Playwright container image, as the example does. It pins the system fonts, so screenshots and baselines stay the same from run to run.
 
