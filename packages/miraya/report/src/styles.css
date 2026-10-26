@@ -838,6 +838,8 @@ input[type='search'] {
   font-weight: 700;
 }
 .table-box {
+  /* Positioned, so screen-reader-only text inside stays in the scroll box. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -1244,7 +1246,12 @@ input[type='search'] {
 }
 @media (max-width: 760px) {
   .layout {
-    grid-template-columns: 1fr;
+    /* minmax(0, …) lets wide tables scroll in their boxes instead of widening the page. */
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .seo-body,
+  .by-engine {
+    padding-inline: 16px;
   }
   .pages {
     border-inline-end: 0;
@@ -1339,7 +1346,7 @@ input[type='search'] {
 }
 .perf-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 16px;
 }
 .perf-panel {
@@ -1446,4 +1453,21 @@ input[type='search'] {
 }
 .request-url .tag {
   margin-inline-start: 6px;
+}
+
+/* Cross-browser */
+.by-engine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 24px 24px;
+}
+.by-engine .seo-h2 {
+  margin-block-end: 0;
+}
+.by-engine tr[aria-current='true'] {
+  background: var(--accent-soft);
+}
+.by-engine td.differs {
+  font-weight: 700;
 }

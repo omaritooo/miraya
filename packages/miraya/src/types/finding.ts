@@ -8,6 +8,9 @@ export type Severity = z.infer<typeof SeveritySchema>
 export const AreaSchema = z.enum(['localization', 'seo', 'performance'])
 export type Area = z.infer<typeof AreaSchema>
 
+export const EngineSchema = z.enum(['chromium', 'firefox', 'webkit'])
+export type Engine = z.infer<typeof EngineSchema>
+
 export const FindingSchema = z.object({
   /** Fingerprint, also used by `explain`. */
   id: z.string(),
@@ -24,6 +27,11 @@ export const FindingSchema = z.object({
   match: MatchMethodSchema.optional(),
   sourceHint: z.string().optional(),
   status: z.enum(['new', 'baselined']).optional(),
+  /**
+   * With several browsers, the engines that found it, when that isn't all of them. A finding
+   * only some engines see is a cross-browser difference. Absent means every engine, or one ran.
+   */
+  engines: z.array(EngineSchema).optional(),
   /** Fingerprint of a fixed baseline entry with the same rule and route: likely the same bug after a DOM change. */
   possiblyMoved: z.string().optional(),
 })

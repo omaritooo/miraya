@@ -282,6 +282,7 @@ async function runAudit(opts: AuditCliOptions) {
       routes: await routesFor(opts, config, browser),
       outDir: opts.out,
       browser,
+      launch: (engine) => launch({ headless: !opts.headed }, engine),
       rtlOnly: !!opts.rtlOnly,
       keepArtifacts: !!opts.keepArtifacts,
       ...(opts.rule ? { only: opts.rule } : {}),
@@ -333,6 +334,7 @@ baseline
         routes: await routesFor(opts, config, browser),
         outDir: opts.out,
         browser,
+        launch: (engine) => launch({}, engine),
         baseline: false,
       }),
     )

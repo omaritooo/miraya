@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { AreaSchema } from './finding'
+import { AreaSchema, EngineSchema } from './finding'
 import type { Dir } from './snapshot'
 
 /**
@@ -108,6 +108,11 @@ export const ConfigSchema = z.object({
   locales: z.object({ ltr: z.string(), rtl: z.string() }).optional(),
   allow: z.object({ latinText: z.array(z.string()).default([]) }).prefault({}),
   source: z.object({ attribute: z.string().optional() }).prefault({}),
+  /**
+   * Browsers to audit every page in. Chromium, if listed, draws the report's screenshots and
+   * runs the performance check; the others add findings only they see.
+   */
+  browsers: z.array(EngineSchema).min(1).default(['chromium']),
   /** The areas to check. Rules of an area left out don't run. */
   checks: z.array(AreaSchema).min(1).default(['localization', 'seo']),
   /** How pages load for the performance check, and the budgets they're held to. */

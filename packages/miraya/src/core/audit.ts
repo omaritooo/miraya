@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import { join, resolve } from 'node:path'
-import { chromium, type Browser, type BrowserContext } from '@playwright/test'
+import { chromium, firefox, webkit, type Browser, type BrowserContext } from '@playwright/test'
 import pkg from '../../package.json'
 import { CollectorError } from '../collector'
 import { builtinRules } from '../rules'
 import type {
+  Engine,
   Finding,
   Report,
   ResolvedConfig,
@@ -20,6 +21,7 @@ import { applyBaseline, readBaseline } from './baseline'
 import { buildCrops, screenshotFrame } from './crops'
 import { loadTranslations } from './translations'
 import { pairSnapshots, type PairingStats } from './pair'
+import { compareEngines, type EngineResult } from './engines'
 import { canMeasure, measureRoute, NETWORK_NAMES } from './perf'
 import {
   openContexts,
@@ -44,8 +46,10 @@ export type AuditOptions = {
   concurrency?: number
   /** Keep the lossless PNG screenshots (used for crops) next to the report. */
   keepArtifacts?: boolean
-  /** Reuse a browser instead of launching one. */
+  /** Reuse a browser instead of launching one, for the engine it is. */
   browser?: Browser
+  /** Launches the other engines in config.browsers; the CLI downloads missing ones. */
+  launch?: (engine: Engine) => Promise<Browser>
   /** Audit inside this context (a Playwright test's), leaving it as it was found. */
   context?: BrowserContext
   beforeCollect?: BeforeCollect
@@ -56,6 +60,11 @@ export type AuditOptions = {
 }
 
 class RouteTimeout extends Error {}
+
+const BROWSERS = { chromium, firefox, webkit }
+
+/** One worker's contexts: the main engine's, and each other engine's. */
+type Worker = { main: Contexts; others: { engine: Engine; contexts: Contexts }[] }
 
 const defaultConcurrency = () => Math.max(1, Math.min(4, Math.floor(availableParallelism() / 2)))
 
@@ -122,18 +131,51 @@ export async function audit(options: AuditOptions): Promise<Report> {
   const translations = loadTranslations(config)
   const measuring = config.checks.includes('performance')
 
-  const given = options.context?.browser() ?? options.browser
-  const browser = given ?? (await chromium.launch({ headless: !options.headed }))
+  // Chromium leads when it's listed: it runs the performance check and draws the report.
+  // Inside a Playwright test, the test's own browser is the only one.
+  const inTest = options.context?.browser()
+  const listed = [...new Set(config.browsers)]
+  const main: Engine = inTest
+    ? (inTest.browserType().name() as Engine)
+    : listed.includes('chromium')
+      ? 'chromium'
+      : (listed[0] as Engine)
+  const engines: Engine[] = inTest ? [main] : [main, ...listed.filter((e) => e !== main)]
+  const launch =
+    options.launch ?? ((engine: Engine) => BROWSERS[engine].launch({ headless: !options.headed }))
+  const given = inTest ?? options.browser
+  const owned: Browser[] = []
+  const open = async (engine: Engine) => {
+    if (given?.browserType().name() === engine) return given
+    const launched = await launch(engine)
+    owned.push(launched)
+    return launched
+  }
+  const browser = await open(main)
+  // Other engines skip performance, which needs Chromium, so their findings compare fairly.
+  const compared = resolved.filter((r) => r.rule.meta.area !== 'performance')
   // Inside a Playwright test the runner owns parallelism, so the helper uses one worker.
   const workers = options.context
     ? 1
     : Math.max(1, Math.min(options.concurrency ?? defaultConcurrency(), routes.length))
-  const pools: Contexts[] = []
+  const pools: Worker[] = []
   try {
+    const extra = await Promise.all(
+      engines.slice(1).map(async (engine) => ({ engine, browser: await open(engine) })),
+    )
     // Each worker owns its contexts, which isolates cookies (DESIGN.md › section 11).
-    for (let i = 0; i < workers; i++)
-      pools.push(await openContexts(browser, config, options.context))
-    const first = pools[0]
+    for (let i = 0; i < workers; i++) {
+      pools.push({
+        main: await openContexts(browser, config, options.context),
+        others: await Promise.all(
+          extra.map(async (e) => ({
+            engine: e.engine,
+            contexts: await openContexts(e.browser, config),
+          })),
+        ),
+      })
+    }
+    const first = pools[0]?.main
     if (!first) throw new ConfigError('No browser context could be opened')
     // Abort before the queue starts if the app isn't reachable.
     try {
@@ -146,10 +188,10 @@ export async function audit(options: AuditOptions): Promise<Report> {
     const results: RouteResult[] = new Array(routes.length)
     let next = 0
     await Promise.all(
-      pools.map(async (contexts) => {
+      pools.map(async (worker) => {
         while (next < routes.length) {
           const index = next++
-          results[index] = await auditRoute(routes[index] as string, contexts)
+          results[index] = await auditRoute(routes[index] as string, worker)
         }
       }),
     )
@@ -188,6 +230,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
           baselined: 0,
           fixed: 0,
         },
+        ...(engines.length > 1 ? { engines } : {}),
         ...(performance ? { performance } : {}),
         routes: results,
         fixed: [],
@@ -195,11 +238,39 @@ export async function audit(options: AuditOptions): Promise<Report> {
       baseline,
     )
   } finally {
-    await Promise.all(pools.map((c) => c.close()))
-    if (!given) await browser.close()
+    await Promise.all(
+      pools.flatMap((w) => [w.main.close(), ...w.others.map((o) => o.contexts.close())]),
+    )
+    await Promise.all(owned.map((b) => b.close()))
   }
 
-  async function auditRoute(route: string, contexts: Contexts): Promise<RouteResult> {
+  /** Audits a route in the main engine and then in each other one, and compares them. */
+  async function auditRoute(route: string, worker: Worker): Promise<RouteResult> {
+    const result = await checkRoute(route, worker.main, outDir, measuring, resolved)
+    if (worker.others.length === 0) return result
+    const others: EngineResult[] = []
+    for (const { engine, contexts } of worker.others) {
+      const prefix = join('engines', engine)
+      const other = await checkRoute(route, contexts, join(outDir, prefix), false, compared)
+      const at = (path: string | undefined) => (path ? join(prefix, path) : undefined)
+      other.screenshots = {
+        ...other.screenshots,
+        ...(other.screenshots.ltr ? { ltr: at(other.screenshots.ltr) } : {}),
+        rtl: at(other.screenshots.rtl) ?? '',
+      }
+      others.push({ engine, result: other })
+    }
+    return compareEngines({ engine: main, result }, others)
+  }
+
+  /** Renders, pairs and checks one route in one engine. Errors become a failed route. */
+  async function checkRoute(
+    route: string,
+    contexts: Contexts,
+    out: string,
+    measure: boolean,
+    use: ReturnType<typeof resolveRules>,
+  ): Promise<RouteResult> {
     const routeStart = Date.now()
     const base = {
       route,
@@ -220,7 +291,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
                 route,
                 'ltr',
                 config,
-                outDir,
+                out,
                 options.beforeCollect,
               )
           const rtl = await renderRoute(
@@ -228,7 +299,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
             route,
             'rtl',
             config,
-            outDir,
+            out,
             options.beforeCollect,
           )
 
@@ -254,11 +325,11 @@ export async function audit(options: AuditOptions): Promise<Report> {
               ] as const
             ).flatMap(([dir, r]) => {
               if (!r) return []
-              const png = join(outDir, r.snapshot.screenshot.png)
+              const png = join(out, r.snapshot.screenshot.png)
               const cache = buildCrops(
                 png,
                 r.snapshot,
-                resolved.map((x) => x.rule),
+                use.map((x) => x.rule),
                 config.deviceScaleFactor,
               )
               if (!options.keepArtifacts) rmSync(png, { force: true })
@@ -268,10 +339,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
           if (options.keepArtifacts) {
             for (const r of [ltr, rtl]) {
               if (!r) continue
-              const file = join(
-                outDir,
-                r.snapshot.screenshot.png.replace(/\.png$/, '.snapshot.json'),
-              )
+              const file = join(out, r.snapshot.screenshot.png.replace(/\.png$/, '.snapshot.json'))
               writeFileSync(file, `${JSON.stringify(r.snapshot, null, 2)}\n`)
             }
           }
@@ -291,7 +359,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
             }
           }
           const perfNotes: string[] = []
-          if (measuring) {
+          if (measure) {
             for (const [dir, r] of [
               ['ltr', ltr],
               ['rtl', rtl],
@@ -306,7 +374,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
               r.snapshot.perf = await measureRoute(context, route, dir, config)
             }
           }
-          const run = runRules(pair, resolved, config, crops, translations)
+          const run = runRules(pair, use, config, crops, translations)
 
           const notes = [
             ...(ltr?.notes ?? []),
@@ -362,7 +430,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
         })(),
         // Each measured load gets the time a route gets, so slow throttled pages still finish.
         config.timeouts.routeMs *
-          (measuring
+          (measure
             ? 1 + (config.performance.runs + config.performance.warmUp) * (rtlOnly ? 1 : 2)
             : 1),
       )
@@ -395,7 +463,10 @@ export function writeReport(report: Report, outDir = '.miraya'): string {
  * a run with a crashed route shouldn't read as "here are all the problems".
  */
 export function exitCode(report: Report, { allowErrors = false } = {}): 0 | 1 | 2 {
-  const errors = report.routes.flatMap((r) => r.errors)
+  const errors = report.routes.flatMap((r) => [
+    ...r.errors,
+    ...Object.values(r.engines ?? {}).flatMap((e) => e.errors),
+  ])
   if (errors.some((e) => e.kind === 'rule-crashed')) return 2
   if (!allowErrors && errors.length > 0) return 2
   const newErrors = report.routes.some((r) =>

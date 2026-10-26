@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/src/site.css" />
     <script>
       // Holds up the first paint: the heading draws late (lcp-budget).
-      for (const start = performance.now(); performance.now() - start < 2600; );
+      for (const start = performance.now(); performance.now() - start < 2600;);
     </script>
   </head>
   <body>
@@ -25,7 +25,7 @@
         banner.textContent = 'عرض خاص'
         document.body.prepend(banner)
         // A long task after the first paint (tbt-budget).
-        for (const start = performance.now(); performance.now() - start < 400; );
+        for (const start = performance.now(); performance.now() - start < 400;);
       }, 300)
     </script>
   </body>

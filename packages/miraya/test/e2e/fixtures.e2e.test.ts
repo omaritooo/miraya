@@ -192,6 +192,43 @@ describe('performance', () => {
   })
 })
 
+describe('cross-browser', () => {
+  it('audits in each engine and marks what only WebKit gets wrong, in the report too', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'miraya-xb-'))
+    const result = await audit({
+      config: parseConfig({ ...config, browsers: ['chromium', 'webkit', 'firefox'] }),
+      routes: ['/cross-browser', '/fallback-font/bad'],
+      browser,
+      outDir,
+    })
+    expect(result.engines).toEqual(['chromium', 'webkit', 'firefox'])
+    const [page, fonts] = result.routes
+    expect(page?.errors).toEqual([])
+    expect(page?.engines?.webkit?.status).toBe('ok')
+    expect(
+      page?.findings.filter((f) => f.engines).map((f) => `${f.rule} ${f.selector} ${f.engines}`),
+    ).toEqual(['not-mirrored [data-testid="badge"] webkit'])
+    // fallback-font needs Chromium; the others skip it instead of disagreeing.
+    expect(fonts?.findings.some((f) => f.rule === 'fallback-font' && !f.engines)).toBe(true)
+    expect(fonts?.findings.filter((f) => f.engines)).toEqual([])
+
+    const { file } = writeHtmlReport(result, outDir)
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    const tab = await context.newPage()
+    try {
+      await tab.goto(`${pathToFileURL(file).href}#area=cross-browser`)
+      await expect
+        .poll(() => tab.locator('.pane-name').allTextContents())
+        .toEqual(['Chromium · RTL', 'WebKit · RTL'])
+      await expect.poll(() => tab.locator('.callout').count()).toBe(1)
+      const axe = await new AxeBuilder({ page: tab }).analyze()
+      expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+    } finally {
+      await context.close()
+    }
+  })
+})
+
 describe('ignore markers', () => {
   it('honours a marker without a reason, and warns about it and about unknown rule ids', () => {
     const route = report.routes.find((r) => r.route === '/ignore-markers')

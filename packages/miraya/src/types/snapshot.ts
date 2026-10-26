@@ -179,6 +179,8 @@ export const SnapshotSchema = z.object({
   docWidth: z.object({ scroll: z.number(), client: z.number() }),
   elements: z.array(ElementSnapSchema),
   head: PageHeadSchema,
+  /** The browser that drew it. */
+  engine: z.enum(['chromium', 'firefox', 'webkit']).optional(),
   /** Present when the performance check ran. */
   perf: PagePerfSchema.optional(),
   /** File paths. */

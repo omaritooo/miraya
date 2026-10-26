@@ -1,5 +1,6 @@
 import type {
   Area,
+  Engine,
   Finding,
   PageHead,
   PagePerf,
@@ -9,7 +10,17 @@ import type {
   Severity,
 } from '../../src/types'
 
-export type { Area, Finding, PageHead, PagePerf, Report, ResourceType, RouteResult, Severity }
+export type {
+  Area,
+  Engine,
+  Finding,
+  PageHead,
+  PagePerf,
+  Report,
+  ResourceType,
+  RouteResult,
+  Severity,
+}
 
 /** What core/report.ts inlines into the page. */
 export type ReportData = {
@@ -22,16 +33,36 @@ export const SEVERITIES: Severity[] = ['error', 'warn', 'info']
 export const STATUSES = ['new', 'known', 'all'] as const
 export type Status = (typeof STATUSES)[number]
 
-export const AREAS: { id: Area; label: string }[] = [
+/** A tab: an area, or cross-browser, which gathers the findings only some engines saw. */
+export type View = Area | 'cross-browser'
+
+export const AREAS: { id: View; label: string }[] = [
   { id: 'localization', label: 'Localization' },
   { id: 'seo', label: 'SEO' },
   { id: 'performance', label: 'Performance' },
+  { id: 'cross-browser', label: 'Cross-browser' },
 ]
 /** Reports from before areas existed only have localization findings. */
 export const areaOf = (f: Finding): Area => f.area ?? 'localization'
+/** Whether a finding belongs on a tab. A cross-browser difference shows in its area's tab too. */
+export const inView = (f: Finding, view: View) =>
+  view === 'cross-browser' ? !!f.engines : areaOf(f) === view
+
+export const ENGINE_NAMES: Record<Engine, string> = {
+  chromium: 'Chromium',
+  firefox: 'Firefox',
+  webkit: 'WebKit',
+}
+/** "Chromium, WebKit and Firefox" */
+export function engineWords(engines: Engine[]) {
+  const names = engines.map((e) => ENGINE_NAMES[e])
+  return names.length > 1
+    ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+    : (names[0] ?? '')
+}
 
 export type Filters = {
-  area: Area
+  area: View
   route?: string
   finding?: string
   /** Severities to show; empty shows all. */
@@ -73,7 +104,7 @@ export function writeHash(filters: Filters): string {
 export const isKnown = (f: Finding) => f.status === 'baselined'
 
 export const matches = (f: Finding, filters: Filters) =>
-  areaOf(f) === filters.area &&
+  inView(f, filters.area) &&
   (!filters.severity.length || filters.severity.includes(f.severity)) &&
   (!filters.rule || filters.rule === f.rule) &&
   (filters.status === 'all' || (filters.status === 'known') === isKnown(f))

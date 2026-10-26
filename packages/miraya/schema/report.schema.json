@@ -136,6 +136,17 @@
       ],
       "additionalProperties": false
     },
+    "engines": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "chromium",
+          "firefox",
+          "webkit"
+        ]
+      }
+    },
     "performance": {
       "type": "object",
       "properties": {
@@ -522,6 +533,124 @@
               }
             },
             "additionalProperties": false
+          },
+          "engines": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "error"
+                  ]
+                },
+                "findings": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "screenshots": {
+                  "type": "object",
+                  "properties": {
+                    "ltr": {
+                      "type": "string"
+                    },
+                    "rtl": {
+                      "type": "string"
+                    },
+                    "frames": {
+                      "type": "object",
+                      "properties": {
+                        "ltr": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "w": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "w"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "rtl": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "w": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "w"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "rtl"
+                  ],
+                  "additionalProperties": false
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "timeout",
+                          "redirected",
+                          "rule-crashed",
+                          "cdp-unavailable",
+                          "failed"
+                        ]
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "rule": {
+                        "type": "string"
+                      },
+                      "finalUrl": {
+                        "type": "string"
+                      },
+                      "stack": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "status",
+                "findings",
+                "screenshots",
+                "errors"
+              ],
+              "additionalProperties": false
+            }
           },
           "perf": {
             "type": "object",
@@ -1178,6 +1307,17 @@
                     "new",
                     "baselined"
                   ]
+                },
+                "engines": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "chromium",
+                      "firefox",
+                      "webkit"
+                    ]
+                  }
                 },
                 "possiblyMoved": {
                   "type": "string"

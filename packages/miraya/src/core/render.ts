@@ -365,6 +365,7 @@ export async function renderRoute(
       snapshot: {
         ...snapshotPart(collected),
         head: { ...collected.head, ...(http ? { http } : {}) },
+        engine: context.browser()?.browserType().name() as Snapshot['engine'],
         url: requested ?? finalUrl,
         finalUrl,
         screenshot: { png, jpeg, truncated },

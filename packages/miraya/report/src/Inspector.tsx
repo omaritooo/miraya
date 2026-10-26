@@ -10,7 +10,15 @@ import {
   TRANSLATION_STATUS,
 } from './copy'
 import { kb, TYPES } from './PerfStage'
-import { areaOf, isKnown, type Area, type Finding, type PagePerf, type RouteResult } from './data'
+import {
+  engineWords,
+  inView,
+  isKnown,
+  type Finding,
+  type PagePerf,
+  type RouteResult,
+  type View,
+} from './data'
 
 export type Tab = 'findings' | 'notes' | 'requests'
 
@@ -29,7 +37,7 @@ export function Inspector({
   onSelect: (id: string) => void
   tab: Tab
   onTab: (tab: Tab) => void
-  area: Area
+  area: View
 }) {
   const notes = [
     ...route.notes,
@@ -99,12 +107,12 @@ function Findings({
   onSelect,
 }: {
   route: RouteResult
-  area: Area
+  area: View
   findings: Finding[]
   selected: Finding | undefined
   onSelect: (id: string) => void
 }) {
-  const inArea = route.findings.filter((f) => areaOf(f) === area)
+  const inArea = route.findings.filter((f) => inView(f, area))
   const hidden = inArea.length - findings.length
   const list = useRef<HTMLOListElement>(null)
 
@@ -128,7 +136,9 @@ function Findings({
                 ? 'No SEO problems on this page.'
                 : area === 'performance'
                   ? 'Every metric is within budget.'
-                  : 'Nothing to fix. The Arabic page matches the English one.'}
+                  : area === 'cross-browser'
+                    ? 'Every engine found the same on this page.'
+                    : 'Nothing to fix. The Arabic page matches the English one.'}
             </p>
           </>
         ) : (
@@ -159,6 +169,7 @@ function Findings({
               <code className="finding-rule">{f.rule}</code>
               <span className="finding-label">{elementLabel(f)}</span>
               <StatusTag finding={f} />
+              {f.engines ? <span className="tag">{engineWords(f.engines)} only</span> : null}
               {f.possiblyMoved ? <span className="tag tag-warn">Moved?</span> : null}
             </button>
           </li>
@@ -266,6 +277,12 @@ function Detail({ finding }: { finding: Finding }) {
               <dd>
                 <code dir="ltr">{finding.sourceHint}</code>
               </dd>
+            </>
+          ) : null}
+          {finding.engines ? (
+            <>
+              <dt>Found in</dt>
+              <dd>{engineWords(finding.engines)} only</dd>
             </>
           ) : null}
           <dt>Fingerprint</dt>

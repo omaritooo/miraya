@@ -18,6 +18,8 @@ export type RuleMeta = {
   /** Weakest pairing method the rule trusts at full severity. */
   minMatch?: MatchMethod
   experimental?: boolean
+  /** Needs Chromium's DevTools protocol; skipped in Firefox and WebKit. */
+  chromiumOnly?: boolean
   /** Checks translated content, so it's skipped with the `attribute` switch, which only flips the layout. */
   needsTranslation?: boolean
   docs: string
@@ -25,7 +27,7 @@ export type RuleMeta = {
 
 export type FindingInput = Omit<
   Finding,
-  'id' | 'area' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved'
+  'id' | 'area' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved' | 'engines'
 > & {
   /** Defaults to the resolved severity. A rule may lower it, never raise it. */
   severity?: Severity

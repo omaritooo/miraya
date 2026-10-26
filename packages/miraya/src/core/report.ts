@@ -39,7 +39,14 @@ export function writeHtmlReport(
   { maxInlineBytes = 25 * 1024 * 1024 } = {},
 ): { file: string; inlined: boolean } {
   const paths = [
-    ...new Set(report.routes.flatMap((r) => [r.screenshots.ltr, r.screenshots.rtl])),
+    ...new Set(
+      report.routes.flatMap((r) => [
+        r.screenshots.ltr,
+        r.screenshots.rtl,
+        // The other engines' Arabic renders, for the cross-browser view.
+        ...Object.values(r.engines ?? {}).map((e) => e.screenshots.rtl),
+      ]),
+    ),
   ].filter((p): p is string => !!p && existsSync(join(outDir, p)))
   const total = paths.reduce((sum, p) => sum + statSync(join(outDir, p)).size, 0)
   const inlined = total * (4 / 3) <= maxInlineBytes

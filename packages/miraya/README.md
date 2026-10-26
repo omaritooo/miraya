@@ -1,6 +1,6 @@
 # Miraya
 
-Finds the bugs that only exist in the right-to-left version of your web app, and checks the SEO and load speed of both languages.
+Finds the bugs that only exist in the right-to-left version of your web app, and checks the SEO and load speed of both languages, in Chromium, WebKit and Firefox.
 
 Miraya opens each page twice in a real browser, once in English (LTR) and once in Arabic (RTL), pairs up the elements between the two, and reports what broke when the page flipped: a sidebar that stayed on the left, a back arrow pointing the wrong way, Arabic drawn in a fallback font, text cut off, English left untranslated.
 
@@ -85,6 +85,7 @@ Everything except `baseUrl` is optional.
 | `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                                                       |
 | `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files).                             |
 | `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                                               |
+| `browsers`                | `['chromium']`              | Engines to audit every page in: `chromium`, `webkit`, `firefox`. See [Cross-browser](#cross-browser).                                                                                                               |
 | `checks`                  | `['localization', 'seo']`   | The areas to check: `localization`, `seo` and `performance`. `--checks localization` runs one area for a single audit.                                                                                              |
 | `performance`             |                             | How pages load for the performance check, and its budgets. See [Performance](#performance).                                                                                                                         |
 | `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                                                           |
@@ -414,6 +415,18 @@ Stylesheets and scripts in the `<head>` that the browser must load before it dra
 Images whose file is larger than the space they're drawn in, by at least 4 KB of wasted bytes.
 
 **Fix:** serve each image at the size it's drawn, with `srcset` and `sizes` for different screens.
+
+## Cross-browser
+
+Safari and Firefox lay some right-to-left pages out differently from Chrome. List the engines, and Miraya audits every page in each of them:
+
+```ts
+browsers: ['chromium', 'webkit', 'firefox'],
+```
+
+The report's Cross-browser tab lists the findings only some engines saw, such as a badge that only WebKit leaves on the wrong side, with Chromium's Arabic render beside that engine's, and a table of each page's findings by engine. Those findings also show in their area's tab, tagged with the engines, and they fail the run like any other. An engine that can't load a page makes the run incomplete (exit 2).
+
+Chromium leads: it draws the main screenshots and runs the performance check. Firefox and WebKit skip `fallback-font`, which asks Chromium which font drew the text, and that isn't counted as a difference. Each engine is about 100 MB to download, once (the CLI does it on first use), and adds its own render of every page to the run time. Inside a Playwright test, the helper audits in the test's own browser only.
 
 ## Using it from code
 

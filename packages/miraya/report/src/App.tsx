@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { GLYPHS, plural, ruleTitle } from './copy'
 import {
-  areaOf,
   AREAS,
+  engineWords,
+  inView,
   isKnown,
   matches,
   readHash,
@@ -18,6 +19,7 @@ import {
 } from './data'
 import { Inspector, type Tab } from './Inspector'
 import { Segmented, SeverityCounts } from './ui'
+import { CrossStage } from './CrossStage'
 import { PerfStage, seconds } from './PerfStage'
 import { SeoStage } from './SeoStage'
 import { Stage } from './Stage'
@@ -70,7 +72,7 @@ function Report({
   filters,
   update,
 }: ReportData & { filters: Filters; update: (next: Partial<Filters>) => void }) {
-  const inArea = useCallback((f: Finding) => areaOf(f) === filters.area, [filters.area])
+  const inArea = useCallback((f: Finding) => inView(f, filters.area), [filters.area])
   // Without a choice, open the first page with something to look at.
   const route =
     report.routes.find((r) => r.route === filters.route) ??
@@ -90,7 +92,8 @@ function Report({
       a.id === filters.area ||
       (a.id === 'seo' && report.routes.some((r) => r.head)) ||
       (a.id === 'performance' && !!report.performance) ||
-      report.routes.some((r) => r.findings.some((f) => areaOf(f) === a.id)),
+      (a.id === 'cross-browser' && (report.engines?.length ?? 0) > 1) ||
+      report.routes.some((r) => r.findings.some((f) => inView(f, a.id))),
   )
   const visible = useMemo(
     () => (route ? route.findings.filter((f) => matches(f, filters)) : []),
@@ -164,7 +167,7 @@ function Report({
               >
                 <span className={`area-dot area-${a.id}`} aria-hidden="true" />
                 {a.label}
-                <SeverityCounts findings={open.filter((f) => areaOf(f) === a.id)} />
+                <SeverityCounts findings={open.filter((f) => inView(f, a.id))} />
               </a>
             ))}
           </nav>
@@ -226,7 +229,18 @@ function Report({
         />
         {route ? (
           <>
-            {filters.area === 'performance' ? (
+            {filters.area === 'cross-browser' ? (
+              <CrossStage
+                report={report}
+                route={route}
+                findings={visible}
+                selected={selected}
+                images={images}
+                viewportWidth={report.config.viewport.w}
+                onSelect={(id) => select(id)}
+                instant={byKeyboard}
+              />
+            ) : filters.area === 'performance' ? (
               <PerfStage
                 route={route}
                 report={report}
@@ -343,7 +357,7 @@ function Pages({
   const shown = report.routes
     .filter((r) => r.route.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => (perf ? lcp(b) - lcp(a) : 0))
-  const scoped = (r: RouteResult) => r.findings.filter((f) => areaOf(f) === filters.area)
+  const scoped = (r: RouteResult) => r.findings.filter((f) => inView(f, filters.area))
   const isClean = (r: RouteResult) => r.status === 'ok' && !worst(scoped(r))
   const clean = shown.filter(isClean)
   // The current page always stays in the list, even when its group is folded.
@@ -477,8 +491,8 @@ function Pages({
       ) : null}
       <h2 className="overline">Run</h2>
       <dl className="run">
-        <dt>Engine</dt>
-        <dd>Chromium</dd>
+        <dt>{(report.engines?.length ?? 1) > 1 ? 'Engines' : 'Engine'}</dt>
+        <dd>{engineWords(report.engines ?? ['chromium'])}</dd>
         <dt>Viewport</dt>
         <dd>
           {report.config.viewport.w}×{report.config.viewport.h}

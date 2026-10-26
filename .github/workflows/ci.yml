@@ -30,7 +30,7 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm --filter @miraya/cli exec playwright install --with-deps chromium
+      - run: pnpm --filter @miraya/cli exec playwright install --with-deps chromium firefox webkit
       # The precision suite: every fixture page must produce exactly its labelled findings.
       - run: pnpm --filter @miraya/cli test:e2e
         env:

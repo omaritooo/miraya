@@ -11,6 +11,8 @@ export default defineRule({
     id: ID,
     defaultSeverity: 'warn',
     needs: 'rtl',
+    // Which font drew the text comes from CSS.getPlatformFontsForNode.
+    chromiumOnly: true,
     // The system font name differs by OS, so it's evidence, never part of the fingerprint.
     fingerprintKeys: ['fontStack'],
     docs: ID,

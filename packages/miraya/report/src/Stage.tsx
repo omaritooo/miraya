@@ -10,7 +10,6 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 
 /** Fit shrinks the page to the pane; the others are fractions of the real page width. Keys 1 to 4. */
 const ZOOMS = ['fit', '0.5', '0.75', '1'] as const
-type Zoom = (typeof ZOOMS)[number]
 const ZOOM_TEXT: Record<Zoom, string> = { fit: 'Fit', '0.5': '50', '0.75': '75', '1': '100' }
 
 const typing = (target: EventTarget | null) =>
@@ -26,6 +25,8 @@ const FAILURES: Record<string, { title: string; command?: string }> = {
 }
 
 /** The page's heading and the two renders side by side, with numbered outlines in document coordinates. */
+export type Zoom = (typeof ZOOMS)[number]
+
 export function Stage({
   route,
   findings,
@@ -173,8 +174,9 @@ function Failed({ route }: { route: RouteResult }) {
   )
 }
 
-function Pane({
+export function Pane({
   dir,
+  label,
   route,
   src,
   frame,
@@ -186,6 +188,8 @@ function Pane({
   instant,
 }: {
   dir: Dir
+  /** Names the pane instead of its language, as the engine does in the cross-browser view. */
+  label?: string
   route: string
   src: string
   frame: Frame
@@ -200,7 +204,7 @@ function Pane({
   // CSS px per screenshot px is unknown until the image loads; the outlines need the height.
   const [docHeight, setDocHeight] = useState<number>()
   const canvasWidth = zoom === 'fit' ? undefined : frame.w * Number(zoom)
-  const name = dir === 'ltr' ? 'English' : 'Arabic'
+  const name = label ?? (dir === 'ltr' ? 'English' : 'Arabic')
   const drawn = findings.filter((f) => f.boxes[dir])
 
   // Selecting a finding brings it into view in both panes.

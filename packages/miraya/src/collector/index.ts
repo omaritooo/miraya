@@ -54,6 +54,8 @@ async function lookUpFonts(cdp: CDPSession, contextId: number, collection: PageC
  * creates one per call, after the page has settled.
  */
 export async function collectPage(page: Page, options: CollectorOptions): Promise<PageCollection> {
+  if (page.context().browser()?.browserType().name() !== 'chromium')
+    return collectWithout(page, options)
   let cdp
   try {
     cdp = await page.context().newCDPSession(page)
@@ -89,5 +91,20 @@ export async function collectPage(page: Page, options: CollectorOptions): Promis
     return collection
   } finally {
     await cdp.detach().catch(() => {})
+  }
+}
+
+/**
+ * Firefox and WebKit have no CDP: the collector runs through Playwright's evaluate, in the
+ * page's own world, and no element gets usedFonts, so fallback-font skips them.
+ */
+async function collectWithout(page: Page, options: CollectorOptions): Promise<PageCollection> {
+  try {
+    await page.evaluate(COLLECTOR_SOURCE)
+    return (await page.evaluate(`__miraya.collect(${JSON.stringify(options)})`)) as PageCollection
+  } catch (error) {
+    throw new CollectorError(
+      `Collector threw: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }

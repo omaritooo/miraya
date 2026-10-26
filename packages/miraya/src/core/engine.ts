@@ -117,7 +117,8 @@ export function runRules(
     if (
       (meta.needs === 'pair' && !pair.ltr) ||
       (area === 'localization' && meta.id !== 'document-direction' && !rtlPage) ||
-      (meta.needsTranslation && layoutOnly)
+      (meta.needsTranslation && layoutOnly) ||
+      (meta.chromiumOnly && (pair.rtl.engine ?? 'chromium') !== 'chromium')
     ) {
       skippedRules.push(meta.id)
       continue

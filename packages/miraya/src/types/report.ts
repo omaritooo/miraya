@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { FindingSchema } from './finding'
+import { EngineSchema, FindingSchema } from './finding'
 import { PageHeadSchema, PagePerfSchema } from './snapshot'
 
 const FixedEntrySchema = z.object({ fingerprint: z.string(), rule: z.string(), route: z.string() })
@@ -50,6 +50,28 @@ export const RouteResultSchema = z.object({
   }),
   /** Each render's head tags, for the SEO view. Absent in reports from before 0.4. */
   head: z.object({ ltr: PageHeadSchema.optional(), rtl: PageHeadSchema.optional() }).optional(),
+  /** How the page went in each engine besides the main one, when several ran. */
+  engines: z
+    .record(
+      z.string(),
+      z.object({
+        status: z.enum(['ok', 'error']),
+        /** Findings in the areas every engine checks: localization and SEO. */
+        findings: z.number().int(),
+        screenshots: z.object({
+          ltr: z.string().optional(),
+          rtl: z.string(),
+          frames: z
+            .object({
+              ltr: z.object({ x: z.number(), w: z.number() }).optional(),
+              rtl: z.object({ x: z.number(), w: z.number() }).optional(),
+            })
+            .optional(),
+        }),
+        errors: z.array(RouteErrorSchema),
+      }),
+    )
+    .optional(),
   /** Each language's load measurements, for the performance view. */
   perf: z.object({ ltr: PagePerfSchema.optional(), rtl: PagePerfSchema.optional() }).optional(),
   findings: z.array(FindingSchema),
@@ -80,6 +102,8 @@ export const ReportSchema = z.object({
     baselined: z.number().int(),
     fixed: z.number().int(),
   }),
+  /** The engines that audited every page, the main one first. Absent means Chromium alone. */
+  engines: z.array(EngineSchema).optional(),
   /** How pages were loaded for the performance check, when it ran. */
   performance: z
     .object({
