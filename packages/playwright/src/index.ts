@@ -6,6 +6,7 @@ import {
   readConfigFile,
   writeHtmlReport,
   writeReport,
+  type Area,
   type ConfigInput,
   type Dir,
   type Finding,
@@ -25,6 +26,11 @@ export interface AuditOptions {
   /** A baseline path, or false to ignore baselines in this test. */
   baseline?: string | false
   rtlOnly?: boolean
+  /**
+   * The areas to check. Defaults to the config file's `checks`, else localization only:
+   * `rtl.expectClean` is about the RTL layout, so SEO runs only when asked for.
+   */
+  checks?: Area[]
   /** Runs after the page settles and before collection, in both directions. */
   beforeCollect?: (page: Page, dir: Dir) => Promise<void>
   /** Path to a config file. Defaults to miraya.config.{ts,mts,js,mjs} in the working directory. */
@@ -57,6 +63,7 @@ async function configFor(opts: AuditOptions) {
       baseUrl,
       ...(opts.switchTo ? { locale: opts.switchTo } : {}),
       rules: { ...fromFile.rules, ...opts.rules },
+      checks: opts.checks ?? fromFile.checks ?? ['localization'],
       ...(opts.baseline !== undefined ? { baseline: opts.baseline } : {}),
     },
     file ?? 'Miraya options',

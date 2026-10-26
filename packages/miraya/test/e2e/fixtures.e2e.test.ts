@@ -37,6 +37,8 @@ const config = parseConfig({
   allow: { latinText: ['Miraya', 'Visa', 'Apple', 'Watch'] },
   // Experimental rules run on every page here, so a false positive anywhere fails the suite.
   experimental: ['bidi-isolation'],
+  // The fixture pages are about layout; SEO has its own page, /seo, below.
+  checks: ['localization'],
 })
 
 let browser: Browser
@@ -114,6 +116,34 @@ describe('failures and other switchers', () => {
   })
 })
 
+describe('SEO', () => {
+  it('reads the head tags of both pages and finds what the Arabic one gets wrong', async () => {
+    const result = await audit({
+      config: parseConfig({ ...config, checks: ['seo'] }),
+      routes: ['/seo'],
+      browser,
+      outDir: mkdtempSync(join(tmpdir(), 'miraya-seo-')),
+    })
+    const route = result.routes[0]
+    expect(route?.errors).toEqual([])
+    expect(route?.head?.rtl).toMatchObject({
+      title: 'الأسعار · مرايا',
+      canonical: [`${FIXTURE_URL}/en/seo/`],
+      h1: ['خطط تنمو مع فريقك'],
+      http: { status: 200 },
+    })
+    expect(route?.head?.ltr?.jsonLd).toEqual([{ types: ['Product'] }])
+    expect(
+      route?.findings.map((f) => `${f.rule} ${f.evidence.check} ${f.evidence.side}`).sort(),
+    ).toEqual([
+      'canonical points-at-twin rtl',
+      'meta-description missing rtl',
+      'structured-data invalid 1 rtl',
+    ])
+    expect(route?.findings.every((f) => f.area === 'seo')).toBe(true)
+  })
+})
+
 describe('ignore markers', () => {
   it('honours a marker without a reason, and warns about it and about unknown rule ids', () => {
     const route = report.routes.find((r) => r.route === '/ignore-markers')
@@ -159,6 +189,11 @@ describe('HTML report', () => {
         .toBe(1)
       const axe = await new AxeBuilder({ page }).analyze()
       expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+      // The SEO tab shows the head tags of both renders, and passes axe too.
+      await page.getByRole('link', { name: /^SEO/ }).click()
+      await expect.poll(() => page.locator('.head-table tbody tr').count()).toBe(8)
+      const seoAxe = await new AxeBuilder({ page }).analyze()
+      expect(seoAxe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
     } finally {
       await context.close()
     }

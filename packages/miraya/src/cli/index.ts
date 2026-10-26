@@ -30,7 +30,7 @@ import {
   writeReport,
   writeSession,
 } from '../core'
-import { ReportSchema, type Report, type ResolvedConfig } from '../types'
+import { AreaSchema, ReportSchema, type Area, type Report, type ResolvedConfig } from '../types'
 import { interactive, launch, openFile } from './browser'
 
 type CommonOptions = { config?: string; baseUrl?: string }
@@ -233,6 +233,7 @@ program
   .option('-o, --out <dir>', 'output folder', '.miraya')
   .option('--format <list>', 'json,html,github; github is added on GitHub Actions', 'json,html')
   .option('--rule <id...>', 'run only these rules')
+  .option('--checks <list>', 'areas to check, comma-separated: localization,seo')
   .option('--rtl-only', 'skip the LTR render and the rules that need it')
   .addOption(
     new Option('--concurrency <n>', 'routes audited in parallel').argParser((v) => Number(v)),
@@ -249,6 +250,7 @@ type AuditCliOptions = CommonOptions & {
   out: string
   format: string
   rule?: string[]
+  checks?: string
   rtlOnly?: boolean
   concurrency?: number
   keepArtifacts?: boolean
@@ -259,8 +261,20 @@ type AuditCliOptions = CommonOptions & {
 
 const AUDIT_DEFAULTS = { out: '.miraya', format: 'json,html', open: true }
 
+function parseChecks(list: string): Area[] {
+  const checks = list.split(',').map((c) => c.trim())
+  const unknown = checks.filter((c) => !AreaSchema.options.includes(c as Area))
+  if (unknown.length || !checks.length) {
+    throw new ConfigError(
+      `Unknown check "${unknown[0] ?? ''}" in --checks; use ${AreaSchema.options.join(', ')}`,
+    )
+  }
+  return checks as Area[]
+}
+
 async function runAudit(opts: AuditCliOptions) {
   const loaded = await loadCliConfig(opts)
+  if (opts.checks) loaded.config.checks = parseChecks(opts.checks)
   const { config } = loaded
   const report = await withApp(loaded, { headless: !opts.headed }, async (browser) =>
     audit({

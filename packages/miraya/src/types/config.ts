@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { AreaSchema } from './finding'
 import type { Dir } from './snapshot'
 
 /**
@@ -107,6 +108,8 @@ export const ConfigSchema = z.object({
   locales: z.object({ ltr: z.string(), rtl: z.string() }).optional(),
   allow: z.object({ latinText: z.array(z.string()).default([]) }).prefault({}),
   source: z.object({ attribute: z.string().optional() }).prefault({}),
+  /** The areas to check. Rules of an area left out don't run. */
+  checks: z.array(AreaSchema).min(1).default(['localization', 'seo']),
   rules: z.record(z.string(), RuleSettingSchema).default({}),
   /** Opt-in experimental rule ids. */
   experimental: z.array(z.string()).default([]),

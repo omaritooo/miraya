@@ -9,6 +9,7 @@ import ltrInputs from './ltr-inputs'
 import mixedDigits from './mixed-digits'
 import notMirrored from './not-mirrored'
 import untranslatedText from './untranslated-text'
+import { seoRules } from './seo'
 
 export { defineRule } from './util'
 
@@ -24,4 +25,5 @@ export const builtinRules = [
   bidiIsolation,
   ltrInputs,
   mixedDigits,
+  ...seoRules,
 ] as Rule<unknown>[]

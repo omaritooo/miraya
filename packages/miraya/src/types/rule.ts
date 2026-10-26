@@ -1,6 +1,6 @@
 import type { ZodType } from 'zod'
 import type { ResolvedConfig } from './config'
-import type { Finding, Severity } from './finding'
+import type { Area, Finding, Severity } from './finding'
 import type { Dir, ElementSnap, MatchMethod, SnapshotPair } from './snapshot'
 import type { Translations } from './translations'
 
@@ -8,6 +8,8 @@ export type RGBAImage = { width: number; height: number; data: Uint8Array }
 
 export type RuleMeta = {
   id: string
+  /** Defaults to localization. Only localization rules wait on the page being right-to-left. */
+  area?: Area
   defaultSeverity: Severity
   needs: 'rtl' | 'pair'
   /** Evidence keys that identify the finding. Categorical values only, never measurements. */
@@ -23,7 +25,7 @@ export type RuleMeta = {
 
 export type FindingInput = Omit<
   Finding,
-  'id' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved'
+  'id' | 'area' | 'docsUrl' | 'status' | 'severity' | 'possiblyMoved'
 > & {
   /** Defaults to the resolved severity. A rule may lower it, never raise it. */
   severity?: Severity

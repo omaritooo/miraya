@@ -315,6 +315,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
               },
               truncated: !!ltr?.snapshot.screenshot.truncated || rtl.snapshot.screenshot.truncated,
             },
+            head: { ...(ltr ? { ltr: ltr.snapshot.head } : {}), rtl: rtl.snapshot.head },
             findings: run.findings,
             errors: run.errors,
           }

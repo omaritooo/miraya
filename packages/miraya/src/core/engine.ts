@@ -43,7 +43,7 @@ export function resolveRules(rules: Rule<unknown>[], config: ResolvedConfig): Re
   for (const rule of rules) {
     const setting = config.rules[rule.meta.id]
     const [level, rawOptions] = Array.isArray(setting) ? setting : [setting, {}]
-    if (level === 'off') continue
+    if (level === 'off' || !config.checks.includes(rule.meta.area ?? 'localization')) continue
     if (rule.meta.experimental && !config.experimental.includes(rule.meta.id)) continue
     const parsed = rule.options.safeParse(rawOptions)
     if (!parsed.success) {
@@ -113,9 +113,10 @@ export function runRules(
 
   for (const { rule, severity, options } of ordered) {
     const { meta } = rule
+    const area = meta.area ?? 'localization'
     if (
       (meta.needs === 'pair' && !pair.ltr) ||
-      (meta.id !== 'document-direction' && !rtlPage) ||
+      (area === 'localization' && meta.id !== 'document-direction' && !rtlPage) ||
       (meta.needsTranslation && layoutOnly)
     ) {
       skippedRules.push(meta.id)
@@ -144,6 +145,7 @@ export function runRules(
         const finding: Finding = {
           ...rest,
           id: fingerprint(rule, input),
+          area,
           severity: level,
           docsUrl: `${DOCS_BASE_URL}${meta.docs}`,
         }

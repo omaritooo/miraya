@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Segmented } from './ui'
+import { plural, routeSummary } from './copy'
 import type { Finding, RouteResult } from './data'
 
 type Dir = 'ltr' | 'rtl'
@@ -7,18 +9,23 @@ type Frame = { x: number; w: number }
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Fit shrinks the page to the pane; the others are fractions of the real page width. Keys 1 to 4. */
-const ZOOMS = [
-  { value: 'fit', label: 'Fit', key: '1' },
-  { value: '0.5', label: '50%', key: '2' },
-  { value: '0.75', label: '75%', key: '3' },
-  { value: '1', label: '100%', key: '4' },
-] as const
-type Zoom = (typeof ZOOMS)[number]['value']
+const ZOOMS = ['fit', '0.5', '0.75', '1'] as const
+type Zoom = (typeof ZOOMS)[number]
+const ZOOM_TEXT: Record<Zoom, string> = { fit: 'Fit', '0.5': '50', '0.75': '75', '1': '100' }
 
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)
 
-/** The two renders side by side. Findings are numbered outlines in document coordinates, scaled to the image. */
+/** What a failed page's error means, and what to do about it. */
+const FAILURES: Record<string, { title: string; command?: string }> = {
+  redirected: { title: 'Redirected', command: 'npx miraya login' },
+  timeout: { title: 'Timed out' },
+  'rule-crashed': { title: 'A rule crashed' },
+  'cdp-unavailable': { title: 'Chromium tools unavailable' },
+  failed: { title: "Couldn't load" },
+}
+
+/** The page's heading and the two renders side by side, with numbered outlines in document coordinates. */
 export function Stage({
   route,
   findings,
@@ -26,6 +33,7 @@ export function Stage({
   images,
   viewportWidth,
   onSelect,
+  onNotes,
   instant,
 }: {
   route: RouteResult
@@ -34,89 +42,166 @@ export function Stage({
   images: Record<string, string>
   viewportWidth: number
   onSelect: (id: string) => void
+  onNotes: () => void
   /** Scroll without easing, as when moving by keyboard. */
   instant: boolean
 }) {
   const sides: Dir[] = route.screenshots.ltr ? ['ltr', 'rtl'] : ['rtl']
-  const [zoom, setZoom] = useState<Zoom>('0.5')
+  const [zoom, setZoom] = useState<Zoom>('fit')
+  const [focus, setFocus] = useState(false)
+  const failed = route.status === 'error'
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return
-      const preset = ZOOMS.find((z) => z.key === e.key)
-      if (preset) setZoom(preset.value)
+      const preset = ZOOMS[Number(e.key) - 1]
+      if (preset) setZoom(preset)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const p = route.pairing
+  const paired = p.testid + p.path + p.heuristic
+  const total = paired + Math.max(p.unmatched.ltr, p.unmatched.rtl)
+  const method =
+    p.testid >= p.path && p.testid >= p.heuristic
+      ? 'test id'
+      : p.path >= p.heuristic
+        ? 'DOM path'
+        : 'position'
+  const notes = route.notes.length + route.skippedRules.length
+
   return (
-    <section
-      className="stage"
-      aria-label="Screenshots"
-      style={{ '--panes': sides.length } as CSSProperties}
-    >
-      <div className="stage-tools">
-        <div className="segmented" role="radiogroup" aria-label="Zoom">
-          {ZOOMS.map((z) => (
-            <label key={z.value} title={`Zoom ${z.label} (${z.key})`}>
-              <input
-                type="radio"
-                name="zoom"
-                value={z.value}
-                checked={zoom === z.value}
-                onChange={() => setZoom(z.value)}
-              />
-              {z.label}
-            </label>
-          ))}
-        </div>
-      </div>
-      {sides.map((dir) => (
-        <Pane
-          key={`${route.route}-${dir}`}
-          dir={dir}
-          src={images[route.screenshots[dir] ?? ''] ?? ''}
-          frame={route.screenshots.frames?.[dir] ?? { x: 0, w: viewportWidth }}
-          findings={findings}
-          selected={selected}
-          onSelect={onSelect}
-          zoom={zoom}
-          instant={instant}
+    <main className="stage" aria-label="Stage">
+      <div className="toolbar" role="toolbar" aria-label="View">
+        <Segmented
+          label="Zoom"
+          options={ZOOMS}
+          value={zoom}
+          text={(z) => ZOOM_TEXT[z]}
+          title={(z) => `${z === 'fit' ? 'Fit' : `${ZOOM_TEXT[z]}%`} (${ZOOMS.indexOf(z) + 1})`}
+          onChange={setZoom}
         />
-      ))}
-      {route.screenshots.truncated ? (
-        <p className="stage-note">
-          Screenshots stop at the maximum page height; findings below it aren't drawn.
-        </p>
-      ) : null}
-    </section>
+        <span className="spacer" />
+        <button
+          type="button"
+          className="button"
+          aria-pressed={focus}
+          disabled={!selected}
+          onClick={() => setFocus(!focus)}
+        >
+          Focus finding
+        </button>
+      </div>
+
+      <div className="stage-head">
+        <h1>
+          <bdi dir="ltr">{route.route}</bdi>
+        </h1>
+        <span className="muted">
+          {failed ? 'Not audited' : routeSummary(route.findings, route.durationMs)}
+        </span>
+        {!failed && total > 0 ? (
+          <span className="muted">
+            Paired by {method}: {paired.toLocaleString('en')} of {total.toLocaleString('en')}{' '}
+            elements
+          </span>
+        ) : null}
+        {notes ? (
+          <button type="button" className="link" onClick={onNotes}>
+            {plural(notes, 'note')}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="screens" style={{ '--panes': sides.length } as CSSProperties}>
+        {failed ? (
+          <Failed route={route} />
+        ) : (
+          sides.map((dir) => (
+            <Pane
+              key={`${route.route}-${dir}`}
+              dir={dir}
+              route={route.route}
+              src={images[route.screenshots[dir] ?? ''] ?? ''}
+              frame={route.screenshots.frames?.[dir] ?? { x: 0, w: viewportWidth }}
+              findings={findings}
+              selected={selected}
+              onSelect={onSelect}
+              zoom={zoom}
+              focus={focus}
+              instant={instant}
+            />
+          ))
+        )}
+        {!failed && route.screenshots.truncated ? (
+          <p className="screens-note">
+            Screenshots stop at the maximum page height; findings below it aren't drawn.
+          </p>
+        ) : null}
+      </div>
+    </main>
+  )
+}
+
+function Failed({ route }: { route: RouteResult }) {
+  return (
+    <div className="state" role="alert">
+      <span className="state-mark sev-error" aria-hidden="true">
+        ⊠
+      </span>
+      <h2>Page couldn't be audited</h2>
+      {route.errors.map((e, i) => {
+        const failure = FAILURES[e.kind] ?? { title: e.kind }
+        return (
+          <div key={i} className="state-body">
+            <p>
+              <strong>{failure.title}.</strong> {e.message}
+            </p>
+            {failure.command ? (
+              <code className="command" dir="ltr">
+                <span className="muted">$ </span>
+                {failure.command}
+              </code>
+            ) : null}
+          </div>
+        )
+      })}
+      <p className="muted">Other pages report normally. The run exits with 2.</p>
+    </div>
   )
 }
 
 function Pane({
   dir,
+  route,
   src,
   frame,
   findings,
   selected,
   onSelect,
   zoom,
+  focus,
   instant,
 }: {
   dir: Dir
+  route: string
   src: string
   frame: Frame
   findings: Finding[]
   selected: Finding | undefined
   onSelect: (id: string) => void
   zoom: Zoom
+  focus: boolean
   instant: boolean
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   // CSS px per screenshot px is unknown until the image loads; the outlines need the height.
   const [docHeight, setDocHeight] = useState<number>()
   const canvasWidth = zoom === 'fit' ? undefined : frame.w * Number(zoom)
+  const name = dir === 'ltr' ? 'English' : 'Arabic'
+  const drawn = findings.filter((f) => f.boxes[dir])
 
   // Selecting a finding brings it into view in both panes.
   useEffect(() => {
@@ -131,10 +216,15 @@ function Pane({
     })
   }, [selected, dir, docHeight, frame.x, frame.w, canvasWidth, instant])
 
+  const focused = focus && selected?.boxes[dir] ? selected.boxes[dir] : undefined
+
   return (
-    <figure className={`pane pane-${dir}`}>
+    <figure className="pane">
       <figcaption>
-        {dir === 'ltr' ? 'English' : 'Arabic'} <span className="muted">{dir.toUpperCase()}</span>
+        <span className="pane-name">
+          {name} · {dir.toUpperCase()}
+        </span>
+        <span>{plural(drawn.length, 'outline')}</span>
       </figcaption>
       {/* Focusable so keyboard users can pan a zoomed screenshot with the arrow keys. */}
       <div
@@ -142,18 +232,18 @@ function Pane({
         ref={scroller}
         tabIndex={0}
         role="region"
-        aria-label={`${dir === 'ltr' ? 'English' : 'Arabic'} screenshot`}
+        aria-label={`${name} screenshot of ${route}`}
       >
         {/* A screenshot is a physical image, so its canvas never mirrors with the report. */}
         <div
-          className={`canvas${selected ? ' has-selection' : ''}`}
+          className="canvas"
           dir="ltr"
           style={canvasWidth ? { inlineSize: `${canvasWidth}px` } : undefined}
         >
           {src ? (
             <img
               src={src}
-              alt={`The page rendered ${dir === 'ltr' ? 'left to right' : 'right to left'}`}
+              alt={`${route} rendered ${dir === 'ltr' ? 'left to right' : 'right to left'}`}
               onLoad={(e) => {
                 const img = e.currentTarget
                 setDocHeight((img.naturalHeight * frame.w) / img.naturalWidth)
@@ -162,6 +252,18 @@ function Pane({
           ) : (
             <p className="missing">Screenshot not available.</p>
           )}
+          {docHeight && focused ? (
+            <span
+              className="scrim"
+              aria-hidden="true"
+              style={{
+                left: `${((focused.x - frame.x) / frame.w) * 100}%`,
+                top: `${(focused.y / docHeight) * 100}%`,
+                width: `${(focused.w / frame.w) * 100}%`,
+                height: `${(focused.h / docHeight) * 100}%`,
+              }}
+            />
+          ) : null}
           {docHeight
             ? findings.map((f, n) => {
                 const box = f.boxes[dir]

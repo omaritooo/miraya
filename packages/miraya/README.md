@@ -1,6 +1,6 @@
 # Miraya
 
-Finds the bugs that only exist in the right-to-left version of your web app.
+Finds the bugs that only exist in the right-to-left version of your web app, and checks the SEO of both languages.
 
 Miraya opens each page twice in a real browser, once in English (LTR) and once in Arabic (RTL), pairs up the elements between the two, and reports what broke when the page flipped: a sidebar that stayed on the left, a back arrow pointing the wrong way, Arabic drawn in a fallback font, text cut off, English left untranslated.
 
@@ -85,6 +85,7 @@ Everything except `baseUrl` is optional.
 | `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                                                       |
 | `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files).                             |
 | `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                                               |
+| `checks`                  | `['localization', 'seo']`   | The areas to check. `--checks localization` runs one area for a single audit.                                                                                                                                       |
 | `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                                                           |
 | `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                                                        |
 | `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                                                    |
@@ -280,6 +281,75 @@ A phone number, price, email, URL or English phrase inside Arabic text can be di
 **Fix:** wrap the run in `<bdi>`, or in an element with `dir="ltr"`.
 
 **Options:** `families`: which kinds to check, from `phone`, `price`, `email`, `url` and `latin-phrase`.
+
+## SEO
+
+Miraya reads the tags search engines and link previews use, from both renders, and the response headers of each page. The report's SEO tab shows them side by side, with each page's search result as the tags draw it. A problem on both languages is one finding; one that only the Arabic page has says so.
+
+| Rule                                    | Default | Finds                                                              |
+| --------------------------------------- | ------- | ------------------------------------------------------------------ |
+| [`page-title`](#page-title)             | error   | A missing title; one too long, too short, or left in English       |
+| [`meta-description`](#meta-description) | warn    | A missing description; one too long, too short, or left in English |
+| [`robots-noindex`](#robots-noindex)     | error   | `noindex` in the robots meta tag or the `X-Robots-Tag` header      |
+| [`canonical`](#canonical)               | error   | A missing canonical, several, or one that names the other language |
+| [`hreflang`](#hreflang)                 | warn    | Language links that don't connect the English and Arabic pages     |
+| [`single-h1`](#single-h1)               | warn    | No `<h1>`, or several                                              |
+| [`social-preview`](#social-preview)     | info    | Missing `og:title`, `og:description` or `og:image`                 |
+| [`structured-data`](#structured-data)   | error   | JSON-LD that isn't valid JSON, or has no `@type`                   |
+
+SEO rules run on every page, whether or not its Arabic render is right to left. Switch the area off with `checks: ['localization']`.
+
+### `page-title`
+
+Search results show a page's `<title>` as the link, and cut it after about 60 characters. Each language needs its own.
+
+**Fix:** give every page its own title in its own language, under 60 characters, with the most specific words first.
+
+**Options:** `maxLength` (60), `minLength` (10).
+
+### `meta-description`
+
+Search results quote the meta description under the title, up to about 160 characters. Without one, they quote whatever text they pick.
+
+**Fix:** write a description of 50 to 160 characters for each page, translated for each language.
+
+**Options:** `maxLength` (160), `minLength` (50).
+
+### `robots-noindex`
+
+`noindex`, in `<meta name="robots">` or the `X-Robots-Tag` header, takes a page out of search results. On a development server (`localhost`, `*.local`, `*.test`, private addresses) that's usually on purpose, so there it's reported as info and doesn't fail the run.
+
+**Fix:** remove `noindex` from pages meant to be found. Keep it on dev and preview servers.
+
+### `canonical`
+
+The canonical link names the one URL a page should be found under. When the Arabic page names the English one, search engines treat the Arabic page as a copy and drop it. Several canonicals are ignored altogether.
+
+**Fix:** build the canonical from the current page's URL, locale included, so each language points at itself.
+
+### `hreflang`
+
+`<link rel="alternate" hreflang>` tells search engines which page to show readers of each language. Each page should list every language version, itself included, with the right language code, plus an `x-default`. Apps that serve both languages from one URL (cookie, storage or attribute switches) can't use hreflang, so the rule skips them.
+
+**Fix:** on every page, link each language version and one `hreflang="x-default"`.
+
+### `single-h1`
+
+A page's `<h1>` names its main topic for search engines and screen readers.
+
+**Fix:** give each page one `<h1>`; use `<h2>` and below for sections.
+
+### `social-preview`
+
+Chat apps and social networks draw shared links from the Open Graph tags. Without them, the preview has no image and guessed text.
+
+**Fix:** add `og:title`, `og:description` and `og:image` (an absolute URL, 1200×630) to each page, in its own language.
+
+### `structured-data`
+
+JSON-LD (`<script type="application/ld+json">`) describes a page to search engines: a product, an article, an organisation. A block that isn't valid JSON is ignored, and one without `@type` says nothing.
+
+**Fix:** make each block valid JSON with an `@type`, and check it with a structured data validator.
 
 ## Using it from code
 

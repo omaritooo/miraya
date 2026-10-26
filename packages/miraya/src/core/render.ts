@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 import { collectPage, DEFAULT_GENERATED_ID_PATTERNS, type PageCollection } from '../collector'
-import type { Dir, ResolvedConfig, Snapshot } from '../types'
+import type { Dir, PageHead, ResolvedConfig, Snapshot } from '../types'
 
 const FREEZE_CSS = `*, *::before, *::after {
   animation: none !important;
@@ -266,6 +266,14 @@ export async function renderRoute(
   const page = await context.newPage()
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
+  // The last main-document response: its status and X-Robots-Tag are part of the page's SEO.
+  let http: PageHead['http']
+  page.on('response', (response) => {
+    const request = response.request()
+    if (!request.isNavigationRequest() || response.frame() !== page.mainFrame()) return
+    const robots = response.headers()['x-robots-tag']
+    http = { status: response.status(), ...(robots ? { robots: robots.toLowerCase() } : {}) }
+  })
   try {
     const requested = await open(page, route, dir, config)
     let finalUrl = page.url()
@@ -356,6 +364,7 @@ export async function renderRoute(
     return {
       snapshot: {
         ...snapshotPart(collected),
+        head: { ...collected.head, ...(http ? { http } : {}) },
         url: requested ?? finalUrl,
         finalUrl,
         screenshot: { png, jpeg, truncated },

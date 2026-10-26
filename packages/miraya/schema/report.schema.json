@@ -275,6 +275,212 @@
             ],
             "additionalProperties": false
           },
+          "head": {
+            "type": "object",
+            "properties": {
+              "ltr": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "robots": {
+                    "type": "string"
+                  },
+                  "canonical": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "alternates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hreflang": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "hreflang",
+                        "href"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "social": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "jsonLd": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "types": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "types"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "h1": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "http": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "robots": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "canonical",
+                  "alternates",
+                  "social",
+                  "jsonLd",
+                  "h1"
+                ],
+                "additionalProperties": false
+              },
+              "rtl": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "robots": {
+                    "type": "string"
+                  },
+                  "canonical": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "alternates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hreflang": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "hreflang",
+                        "href"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "social": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "jsonLd": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "types": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "types"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "h1": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "http": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "robots": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "canonical",
+                  "alternates",
+                  "social",
+                  "jsonLd",
+                  "h1"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "findings": {
             "type": "array",
             "items": {
@@ -285,6 +491,13 @@
                 },
                 "rule": {
                   "type": "string"
+                },
+                "area": {
+                  "type": "string",
+                  "enum": [
+                    "localization",
+                    "seo"
+                  ]
                 },
                 "severity": {
                   "type": "string",

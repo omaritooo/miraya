@@ -1,5 +1,5 @@
 import { parseConfig } from '../src/core/config'
-import type { Box, ElementSnap, Snapshot } from '../src/types'
+import type { Box, ElementSnap, PageHead, Snapshot } from '../src/types'
 
 /** A translated app by default; pass `locale: { strategy: 'attribute' }` for layout-only runs. */
 export const config = (input: Record<string, unknown> = {}) =>
@@ -39,7 +39,7 @@ export function el(partial: Partial<ElementSnap> & { box: Box }): ElementSnap {
 export function snapshot(
   dir: 'ltr' | 'rtl',
   elements: ElementSnap[],
-  extra: Partial<Snapshot> = {},
+  { head, ...extra }: Omit<Partial<Snapshot>, 'head'> & { head?: Partial<PageHead> } = {},
 ): Snapshot {
   return {
     url: 'http://localhost:4000/',
@@ -50,6 +50,7 @@ export function snapshot(
     docHeight: 800,
     docWidth: { scroll: 1000, client: 1000 },
     elements,
+    head: { canonical: [], alternates: [], social: {}, jsonLd: [], h1: [], ...head },
     screenshot: { png: '', jpeg: '', truncated: false },
     stats: { visited: 0, collected: elements.length, skipped: 0, capped: false, errors: 0 },
     pageErrors: [],

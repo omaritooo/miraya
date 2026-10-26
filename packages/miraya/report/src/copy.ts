@@ -38,6 +38,38 @@ const RULES: Record<string, { title: string; fix: string }> = {
     title: 'The page mixes two kinds of digits',
     fix: 'Format every number with one locale, for example Intl.NumberFormat("ar-EG") everywhere.',
   },
+  'page-title': {
+    title: 'The title is missing, too long or untranslated',
+    fix: 'Give every page its own <title> in its own language, under 60 characters, with the most specific words first.',
+  },
+  'meta-description': {
+    title: 'The description is missing, too long or untranslated',
+    fix: 'Write a meta description of 50 to 160 characters for each page, translated for each language.',
+  },
+  'robots-noindex': {
+    title: 'Search engines are told not to index this page',
+    fix: 'Remove noindex from <meta name="robots"> and the X-Robots-Tag header on pages meant to be found. Keep it on dev and preview servers.',
+  },
+  canonical: {
+    title: 'The canonical link is missing or points elsewhere',
+    fix: "Build the canonical from the current page's own URL, locale included: each language points at itself and lists the other in hreflang.",
+  },
+  hreflang: {
+    title: "The language links don't connect the two pages",
+    fix: 'On every page, link each language version, itself included, with <link rel="alternate" hreflang>, plus one hreflang="x-default".',
+  },
+  'single-h1': {
+    title: 'The page has no h1, or several',
+    fix: 'Give each page one <h1> that names its main topic; use h2 and below for sections.',
+  },
+  'social-preview': {
+    title: 'Shared links have no preview',
+    fix: 'Add og:title, og:description and og:image (an absolute URL, 1200×630) to each page, in its own language.',
+  },
+  'structured-data': {
+    title: "Search engines can't read the structured data",
+    fix: 'Make each <script type="application/ld+json"> valid JSON with an @type, and check it with a structured data validator.',
+  },
   'bidi-isolation': {
     title: 'Displays scrambled inside Arabic text',
     fix: 'Wrap it in <bdi> or an element with dir="ltr".',
@@ -70,9 +102,19 @@ export const TRANSLATION_STATUS: Record<string, string> = {
 }
 
 export const SEVERITY_WORDS: Record<Severity, string> = {
-  error: 'Must fix',
-  warn: 'Should fix',
-  info: 'Note',
+  error: 'Error',
+  warn: 'Warning',
+  info: 'Info',
+}
+
+/** Severity is never colour alone: each has a shape, as in the design system. */
+export const GLYPHS: Record<Severity, string> = { error: '◆', warn: '▲', info: '●' }
+
+/** Which language an SEO finding is about. */
+export const SIDE_WORDS: Record<string, string> = {
+  ltr: 'English only',
+  rtl: 'Arabic only',
+  both: 'both',
 }
 
 /** Evidence keys in plain words. Keys without an entry keep their own name. */
@@ -121,21 +163,40 @@ const EVIDENCE: Record<string, string> = {
   translation: 'Translation',
   translationKey: 'Key',
   translationFile: 'File',
+  side: 'Language',
+  length: 'Characters',
+  max: 'Most allowed',
+  min: 'Fewest allowed',
+  target: 'Points at',
+  expected: 'Expected',
+  found: 'Found',
+  source: 'Set in',
+  value: 'Value',
+  local: 'Development server',
+  missing: 'Missing',
+  block: 'Block',
+  error: 'Parse error',
+  hreflang: 'hreflang',
 }
 export const evidenceLabel = (key: string) => EVIDENCE[key] ?? key
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+export const plural = (n: number, one: string, many = `${one}s`) =>
+  `${n.toLocaleString('en')} ${n === 1 ? one : many}`
 
-/** A one-line verdict for a route, in words people use. */
-export function routeVerdict(findings: Finding[], failed: boolean): string {
-  if (failed) return "This page couldn't be checked."
-  const mustFix = findings.filter((f) => f.severity === 'error' && f.status !== 'baselined').length
-  const shouldFix = findings.filter((f) => f.severity === 'warn' && f.status !== 'baselined').length
-  if (findings.length === 0) return 'No right-to-left problems on this page.'
-  if (mustFix + shouldFix === 0) return 'Nothing new to fix on this page.'
-  const parts = [
-    mustFix ? plural(mustFix, 'problem to fix', 'problems to fix') : '',
-    shouldFix ? plural(shouldFix, 'thing worth fixing', 'things worth fixing') : '',
-  ]
-  return `${parts.filter(Boolean).join(' and ')}.`
+/** The page's line under its path: "4 findings, 2 new · 1.8 s". */
+export function routeSummary(findings: Finding[], durationMs: number): string {
+  const fresh = findings.filter((f) => f.status !== 'baselined').length
+  const count = findings.length
+    ? `${plural(findings.length, 'finding')}${fresh < findings.length ? `, ${fresh} new` : ''}`
+    : 'No findings'
+  return `${count} · ${(durationMs / 1000).toFixed(1)} s`
+}
+
+/** What to call an element in a list row: its own text when it has some, else its selector's tail. */
+export function elementLabel(finding: Finding): string {
+  const side = finding.evidence.side
+  if (typeof side === 'string' && SIDE_WORDS[side]) return SIDE_WORDS[side]
+  const text = finding.evidence.text
+  if (typeof text === 'string' && text.trim()) return text.trim()
+  return finding.selector.split(/\s*>\s*/).at(-1) ?? finding.selector
 }

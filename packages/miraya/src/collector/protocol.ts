@@ -1,4 +1,4 @@
-import type { Dir, ElementSnap, Snapshot } from '../types'
+import type { Dir, ElementSnap, PageHead, Snapshot } from '../types'
 
 /** Options passed from Node into the in-page collector. Must be JSON-serialisable. */
 export type CollectorOptions = {
@@ -23,6 +23,8 @@ export type PageCollection = {
   docHeight: number
   docWidth: Snapshot['docWidth']
   elements: ElementSnap[]
+  /** Node adds the response status and headers. */
+  head: Omit<PageHead, 'http'>
   stats: Snapshot['stats']
 }
 

@@ -37,6 +37,7 @@ Both functions take the same options:
 | `beforeCollect` | `async (page, dir) => {}`: runs once the page has settled, before measuring. Open a menu, dismiss a banner.                                                                                       |
 | `config`        | Path to a config file, if it isn't `miraya.config.ts` in the working directory.                                                                                                                   |
 | `failOn`        | `expectClean` only: the lowest severity that fails the test. `'error'` (default), `'warn'` or `'info'`.                                                                                           |
+| `checks`        | The areas to check, such as `['localization', 'seo']`. Defaults to the config file's `checks`, else localization only.                                                                            |
 
 To inspect findings yourself instead of failing:
 

@@ -200,6 +200,62 @@ function cssString(value: string) {
   return `"${value.replace(/["\\]/g, '\\$&')}"`
 }
 
+const H1_MAX = 120
+
+/** The <head> tags search engines and link previews read, and the page's h1s. */
+function collectHead(doc: Document): PageCollection['head'] {
+  const squash = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim()
+  const metaContent = (selector: string) => {
+    const el = doc.querySelector(selector)
+    return el ? squash(el.getAttribute('content')) : undefined
+  }
+  const absolute = (href: string) => {
+    try {
+      return new URL(href, doc.baseURI).href
+    } catch {
+      return href
+    }
+  }
+  const social: Record<string, string> = {}
+  for (const el of doc.querySelectorAll('meta[property], meta[name]')) {
+    const name = (el.getAttribute('property') ?? el.getAttribute('name') ?? '').toLowerCase()
+    if (/^(og|twitter):/.test(name) && !(name in social)) {
+      social[name] = squash(el.getAttribute('content'))
+    }
+  }
+  const typesOf = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.flatMap(typesOf)
+    if (!value || typeof value !== 'object') return []
+    const node = value as Record<string, unknown>
+    const own = ([] as unknown[]).concat(node['@type'] ?? []).map(String)
+    return [...own, ...typesOf(node['@graph'])]
+  }
+  const title = doc.querySelector('head title') ?? doc.querySelector('title')
+  const description = metaContent('meta[name="description" i]')
+  const robots = metaContent('meta[name="robots" i]')
+  return {
+    ...(title ? { title: squash(title.textContent) } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(robots !== undefined ? { robots: robots.toLowerCase() } : {}),
+    canonical: [...doc.querySelectorAll('link[rel~="canonical" i][href]')].map((el) =>
+      absolute(el.getAttribute('href') ?? ''),
+    ),
+    alternates: [...doc.querySelectorAll('link[rel~="alternate" i][hreflang][href]')].map((el) => ({
+      hreflang: (el.getAttribute('hreflang') ?? '').toLowerCase(),
+      href: absolute(el.getAttribute('href') ?? ''),
+    })),
+    social,
+    jsonLd: [...doc.querySelectorAll('script[type="application/ld+json" i]')].map((el) => {
+      try {
+        return { types: typesOf(JSON.parse(el.textContent ?? '')) }
+      } catch (error) {
+        return { types: [], error: error instanceof Error ? error.message : String(error) }
+      }
+    }),
+    h1: [...doc.querySelectorAll('h1')].map((el) => squash(el.textContent).slice(0, H1_MAX)),
+  }
+}
+
 export function collect(options: CollectorOptions): PageCollection {
   const doc = document
   const root = doc.documentElement
@@ -422,6 +478,7 @@ export function collect(options: CollectorOptions): PageCollection {
     docHeight: root.scrollHeight,
     docWidth,
     elements,
+    head: collectHead(doc),
     stats,
   }
 }

@@ -91,6 +91,27 @@ export const ElementSnapSchema = z.object({
 })
 export type ElementSnap = z.infer<typeof ElementSnapSchema>
 
+/** What search engines and link previews read from a page: its <head> tags and its h1s. */
+export const PageHeadSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  /** The robots meta content, lower-cased; the X-Robots-Tag header is in `http`. */
+  robots: z.string().optional(),
+  /** Every rel=canonical href, resolved against the page URL. */
+  canonical: z.array(z.string()),
+  /** rel=alternate links with an hreflang, resolved. */
+  alternates: z.array(z.object({ hreflang: z.string(), href: z.string() })),
+  /** og:* and twitter:* meta tags, by property name. The first of each wins. */
+  social: z.record(z.string(), z.string()),
+  /** Each JSON-LD block: its @type values, or why it didn't parse. */
+  jsonLd: z.array(z.object({ types: z.array(z.string()), error: z.string().optional() })),
+  /** Text of each h1, whitespace-collapsed, 120 chars at most. */
+  h1: z.array(z.string()),
+  /** The main document's response; absent when the page wasn't loaded by a navigation. */
+  http: z.object({ status: z.number().int(), robots: z.string().optional() }).optional(),
+})
+export type PageHead = z.infer<typeof PageHeadSchema>
+
 export const SnapshotSchema = z.object({
   url: z.string(),
   finalUrl: z.string(),
@@ -101,6 +122,7 @@ export const SnapshotSchema = z.object({
   /** Document scrollWidth and clientWidth, for page-level horizontal overflow. */
   docWidth: z.object({ scroll: z.number(), client: z.number() }),
   elements: z.array(ElementSnapSchema),
+  head: PageHeadSchema,
   /** File paths. */
   screenshot: z.object({ png: z.string(), jpeg: z.string(), truncated: z.boolean() }),
   stats: z.object({

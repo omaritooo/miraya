@@ -1,5 +1,6 @@
 import * as z from 'zod'
 import { FindingSchema } from './finding'
+import { PageHeadSchema } from './snapshot'
 
 const FixedEntrySchema = z.object({ fingerprint: z.string(), rule: z.string(), route: z.string() })
 
@@ -47,6 +48,8 @@ export const RouteResultSchema = z.object({
       })
       .optional(),
   }),
+  /** Each render's head tags, for the SEO view. Absent in reports from before 0.4. */
+  head: z.object({ ltr: PageHeadSchema.optional(), rtl: PageHeadSchema.optional() }).optional(),
   findings: z.array(FindingSchema),
   errors: z.array(RouteErrorSchema),
 })
