@@ -15,6 +15,7 @@ const QUIET_MS = 500
 // first visit can bring a few batches.
 const MAX_RENDER_ATTEMPTS = 6
 const STABLE_MS = 300
+const SHOT_TIMEOUT_MS = 10_000
 const NAVIGATION_ERROR =
   /Execution context was destroyed|Cannot find context with specified id|because of a navigation/
 
@@ -254,6 +255,22 @@ export type RenderResult = {
   markers: PageCollection['markers']
 }
 
+const CLOSE_TIMEOUT_MS = 5000
+
+/**
+ * Closing a page in the middle of a reload can wait half a minute. Past a few seconds, leave
+ * it: its context closes at the end of the run and takes it along.
+ */
+export async function closePage(page: Page) {
+  const closing = page.close().catch(() => {})
+  let timer: NodeJS.Timeout | undefined
+  const waited = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, CLOSE_TIMEOUT_MS)
+  })
+  await Promise.race([closing, waited])
+  clearTimeout(timer)
+}
+
 /** Opens, settles, collects and screenshots one route in one direction. */
 export async function renderRoute(
   context: BrowserContext,
@@ -289,13 +306,18 @@ export async function renderRoute(
     // waitForLoadState can resolve against the old document if the new navigation hasn't
     // started yet, so wait until the page has loaded and stopped navigating for a moment.
     const waitForStableDocument = async () => {
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 10; i++) {
         const seen = navigations
         await page.waitForLoadState('load').catch(() => {})
         await page.waitForTimeout(STABLE_MS)
-        if (navigations === seen) return
+        if (navigations === seen) return true
       }
+      return false
     }
+    const keptReloading = (attempts: number) =>
+      new Error(
+        `The page kept reloading during the audit (${attempts} attempts). Dev servers reload while they optimise dependencies on a first visit, or when a file is saved; running again usually works, and a production build avoids it. Also check that the dev server doesn't watch Miraya's output folder.`,
+      )
     const notes: string[] = []
     const relDir = join('routes', routeSlug(route))
     const png = join(relDir, `${dir}.png`)
@@ -326,6 +348,9 @@ export async function renderRoute(
         })
         truncated = result.docHeight > config.maxPageHeight
         const shot = {
+          // A screenshot that starts as the page reloads can wait forever; let it fail so the
+          // render is retried, below, instead of using up the route's whole timeout.
+          timeout: SHOT_TIMEOUT_MS,
           fullPage: true,
           animations: 'disabled' as const,
           caret: 'hide' as const,
@@ -344,13 +369,10 @@ export async function renderRoute(
         if (!navigated) throw error
       }
       if (!collected) {
-        if (attempt >= MAX_RENDER_ATTEMPTS) {
-          throw new Error(
-            `The page kept reloading during the audit (${attempt} attempts). Dev servers reload while they optimise dependencies on a first visit, so running again usually works; a production build avoids it. Also check that the dev server doesn't watch Miraya's output folder.`,
-          )
-        }
+        if (attempt >= MAX_RENDER_ATTEMPTS) throw keptReloading(attempt)
         notes.push(`${dir}: the page reloaded during the audit, so it was rendered again`)
-        await waitForStableDocument()
+        // A page that never stops reloading fails now, with the reason, not at the route timeout.
+        if (!(await waitForStableDocument())) throw keptReloading(attempt)
         finalUrl = page.url()
         checkRedirect(requested, finalUrl, config, route)
       }
@@ -375,6 +397,6 @@ export async function renderRoute(
       markers: collected.markers,
     }
   } finally {
-    await page.close()
+    await closePage(page)
   }
 }

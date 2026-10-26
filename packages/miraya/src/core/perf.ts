@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test'
 import type { Dir, PagePerf, ResolvedConfig, ResourceType } from '../types'
-import { open } from './render'
+import { closePage, open } from './render'
 
 /** Chrome DevTools' presets, so numbers compare with what developers see there. */
 const NETWORKS = {
@@ -269,7 +269,7 @@ async function loadOnce(
         .map((r) => (blocking.has(r.url) ? { ...r, blocking: true } : r)),
     }
   } finally {
-    await page.close()
+    await closePage(page)
   }
 }
 

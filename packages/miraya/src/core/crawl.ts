@@ -2,7 +2,7 @@ import type { Browser } from '@playwright/test'
 import picomatch from 'picomatch'
 import type { ResolvedConfig } from '../types'
 import { ConfigError } from './engine'
-import { open, openContexts } from './render'
+import { closePage, open, openContexts } from './render'
 
 const DEFAULT_EXCLUDE = [
   '/logout',
@@ -89,7 +89,7 @@ export async function crawl(browser: Browser, config: ResolvedConfig): Promise<s
         } catch {
           // A route that fails to open is still audited, and reported there.
         } finally {
-          await page.close()
+          await closePage(page)
         }
       }
       frontier = nextFrontier

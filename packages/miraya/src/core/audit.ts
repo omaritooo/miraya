@@ -113,7 +113,8 @@ export async function audit(options: AuditOptions): Promise<Report> {
   const { config } = options
   const started = Date.now()
   const outDir = resolve(options.outDir ?? '.miraya')
-  const routes = options.routes ?? config.routes ?? []
+  // A route listed twice would only be audited twice, and compared with itself across the site.
+  const routes = [...new Set(options.routes ?? config.routes ?? [])]
   if (routes.length === 0) throw new ConfigError('No routes to audit: set `routes` in the config')
   const rtlOnly = options.rtlOnly ?? false
 
