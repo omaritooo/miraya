@@ -112,6 +112,62 @@ export const PageHeadSchema = z.object({
 })
 export type PageHead = z.infer<typeof PageHeadSchema>
 
+const ResourceTypeSchema = z.enum(['document', 'script', 'style', 'font', 'image', 'other'])
+export type ResourceType = z.infer<typeof ResourceTypeSchema>
+
+/** How fast a page loaded under throttling: the median of the measured runs. Chromium only. */
+export const PagePerfSchema = z.object({
+  /** Largest contentful paint, and the element that drew it. */
+  lcp: z
+    .object({
+      ms: z.number(),
+      selector: z.string().optional(),
+      /** The element's box in document CSS px, when it was still on the page. */
+      box: BoxSchema.optional(),
+      /** The image or video behind it, if any. */
+      url: z.string().optional(),
+    })
+    .optional(),
+  fcpMs: z.number().optional(),
+  /** Cumulative layout shift: the largest session window, as Core Web Vitals counts it. */
+  cls: z.number(),
+  /** Total blocking time: long-task time past 50 ms, after the first paint. */
+  tbtMs: z.number(),
+  requests: z.number().int(),
+  /** Bytes over the network, by type. */
+  bytes: z.object(
+    Object.fromEntries(ResourceTypeSchema.options.map((t) => [t, z.number().int()])) as Record<
+      ResourceType,
+      z.ZodNumber
+    >,
+  ),
+  renderBlocking: z.array(
+    z.object({ url: z.string(), type: ResourceTypeSchema, bytes: z.number().int() }),
+  ),
+  /** Images drawn smaller than their file, and the bytes that costs. */
+  oversizedImages: z.array(
+    z.object({
+      url: z.string(),
+      selector: z.string(),
+      natural: z.object({ w: z.number().int(), h: z.number().int() }),
+      shown: z.object({ w: z.number().int(), h: z.number().int() }),
+      bytes: z.number().int(),
+      wastedBytes: z.number().int(),
+    }),
+  ),
+  /** The heaviest requests, largest first. */
+  resources: z.array(
+    z.object({
+      url: z.string(),
+      type: ResourceTypeSchema,
+      bytes: z.number().int(),
+      blocking: z.boolean().optional(),
+    }),
+  ),
+  runs: z.number().int(),
+})
+export type PagePerf = z.infer<typeof PagePerfSchema>
+
 export const SnapshotSchema = z.object({
   url: z.string(),
   finalUrl: z.string(),
@@ -123,6 +179,8 @@ export const SnapshotSchema = z.object({
   docWidth: z.object({ scroll: z.number(), client: z.number() }),
   elements: z.array(ElementSnapSchema),
   head: PageHeadSchema,
+  /** Present when the performance check ran. */
+  perf: PagePerfSchema.optional(),
   /** File paths. */
   screenshot: z.object({ png: z.string(), jpeg: z.string(), truncated: z.boolean() }),
   stats: z.object({

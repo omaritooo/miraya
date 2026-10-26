@@ -6,11 +6,13 @@ import {
   ruleFix,
   ruleTitle,
   SEVERITY_WORDS,
+  SIDE_WORDS,
   TRANSLATION_STATUS,
 } from './copy'
-import { areaOf, isKnown, type Area, type Finding, type RouteResult } from './data'
+import { kb, TYPES } from './PerfStage'
+import { areaOf, isKnown, type Area, type Finding, type PagePerf, type RouteResult } from './data'
 
-export type Tab = 'findings' | 'notes'
+export type Tab = 'findings' | 'notes' | 'requests'
 
 export function Inspector({
   route,
@@ -33,12 +35,16 @@ export function Inspector({
     ...route.notes,
     ...route.skippedRules.map((rule) => `Skipped ${rule} on this page.`),
   ]
+  // The slower language's requests: the ones worth trimming.
+  const requests = area === 'performance' ? (route.perf?.rtl ?? route.perf?.ltr) : undefined
   const tabs: [Tab, string, number][] = [
     ['findings', 'Findings', findings.length],
+    ...(requests ? [['requests', 'Requests', requests.requests] as [Tab, string, number]] : []),
     ['notes', 'Notes', notes.length],
   ]
+  const current = tab === 'requests' && !requests ? 'findings' : tab
   return (
-    <aside className="inspector" aria-label="Inspector">
+    <aside className="inspector" id="inspector" tabIndex={-1} aria-label="Inspector">
       <div className="tabs" role="tablist" aria-label="Inspector">
         {tabs.map(([id, label, count]) => (
           <button
@@ -46,7 +52,7 @@ export function Inspector({
             role="tab"
             key={id}
             id={`tab-${id}`}
-            aria-selected={tab === id}
+            aria-selected={current === id}
             aria-controls={`panel-${id}`}
             onClick={() => onTab(id)}
           >
@@ -54,7 +60,11 @@ export function Inspector({
           </button>
         ))}
       </div>
-      {tab === 'findings' ? (
+      {current === 'requests' && requests ? (
+        <div role="tabpanel" id="panel-requests" aria-labelledby="tab-requests">
+          <Requests perf={requests} arabic={!!route.perf?.rtl} />
+        </div>
+      ) : current === 'findings' ? (
         <div role="tabpanel" id="panel-findings" aria-labelledby="tab-findings">
           <Findings
             route={route}
@@ -116,7 +126,9 @@ function Findings({
             <p>
               {area === 'seo'
                 ? 'No SEO problems on this page.'
-                : 'Nothing to fix. The Arabic page matches the English one.'}
+                : area === 'performance'
+                  ? 'Every metric is within budget.'
+                  : 'Nothing to fix. The Arabic page matches the English one.'}
             </p>
           </>
         ) : (
@@ -286,7 +298,11 @@ function Detail({ finding }: { finding: Finding }) {
                 <tr key={key}>
                   <th scope="row">{evidenceLabel(key)}</th>
                   <td dir="ltr">
-                    <code>{String(value)}</code>
+                    <code>
+                      {key === 'side'
+                        ? (SIDE_WORDS[String(value)] ?? String(value))
+                        : String(value)}
+                    </code>
                   </td>
                 </tr>
               ))}
@@ -328,4 +344,48 @@ function Detail({ finding }: { finding: Finding }) {
       </div>
     </section>
   )
+}
+
+const TYPE_LABELS = Object.fromEntries(TYPES.map((t) => [t.id, t.label]))
+
+function Requests({ perf, arabic }: { perf: PagePerf; arabic: boolean }) {
+  const shown = perf.resources
+  return (
+    <div className="requests">
+      <p className="caption list-note">
+        {arabic ? 'Arabic page' : 'English page'}, heaviest first
+        {perf.requests > shown.length ? `; the ${shown.length} largest of ${perf.requests}` : ''}.
+      </p>
+      <table className="evidence">
+        <thead>
+          <tr>
+            <th scope="col">File</th>
+            <th scope="col">Type</th>
+            <th scope="col">KB</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r, i) => (
+            <tr key={`${r.url}${i}`}>
+              <td dir="ltr" className="request-url">
+                <code title={r.url}>{path(r.url)}</code>
+                {r.blocking ? <span className="tag tag-warn">Blocking</span> : null}
+              </td>
+              <td>{TYPE_LABELS[r.type] ?? r.type}</td>
+              <td>{kb(r.bytes).toLocaleString('en-US')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const path = (url: string) => {
+  try {
+    const u = new URL(url)
+    return `${u.host === location.host ? '' : u.host}${u.pathname}`
+  } catch {
+    return url
+  }
 }

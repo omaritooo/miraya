@@ -144,6 +144,54 @@ describe('SEO', () => {
   })
 })
 
+describe('performance', () => {
+  it('measures both pages and flags what only the Arabic one does, in the report too', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'miraya-perf-'))
+    // Unthrottled, one load: the fixture's slow parts are wall-clock waits, not CPU work.
+    const result = await audit({
+      config: parseConfig({
+        ...config,
+        checks: ['performance'],
+        performance: { runs: 1, warmUp: 0, cpuSlowdown: 1, network: 'none' },
+      }),
+      routes: ['/perf'],
+      browser,
+      outDir,
+    })
+    const route = result.routes[0]
+    expect(route?.errors).toEqual([])
+    expect(result.performance).toMatchObject({ network: 'Unthrottled', runs: 1 })
+    expect(route?.perf?.ltr?.lcp?.ms).toBeLessThan(2500)
+    expect(route?.perf?.rtl?.lcp).toMatchObject({ selector: expect.stringContaining('h1') })
+    expect(route?.perf?.rtl?.oversizedImages[0]).toMatchObject({
+      natural: { w: 400, h: 300 },
+      shown: { w: 100, h: 75 },
+    })
+    expect(route?.findings.map((f) => `${f.rule} ${f.evidence.side}`).sort()).toEqual([
+      'cls-budget rtl',
+      'lcp-budget rtl',
+      'oversized-images rtl',
+      'render-blocking both',
+      'tbt-budget rtl',
+    ])
+
+    const { file } = writeHtmlReport(result, outDir)
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    const page = await context.newPage()
+    try {
+      await page.goto(`${pathToFileURL(file).href}#area=performance`)
+      await expect.poll(() => page.locator('.metrics tbody tr').count()).toBe(6)
+      await expect.poll(() => page.locator('.lcp-box').count()).toBe(1)
+      await page.getByRole('tab', { name: /Requests/ }).click()
+      await expect.poll(() => page.locator('#panel-requests tbody tr').count()).toBeGreaterThan(3)
+      const axe = await new AxeBuilder({ page }).analyze()
+      expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([])
+    } finally {
+      await context.close()
+    }
+  })
+})
+
 describe('ignore markers', () => {
   it('honours a marker without a reason, and warns about it and about unknown rule ids', () => {
     const route = report.routes.find((r) => r.route === '/ignore-markers')

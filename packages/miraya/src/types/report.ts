@@ -1,6 +1,6 @@
 import * as z from 'zod'
 import { FindingSchema } from './finding'
-import { PageHeadSchema } from './snapshot'
+import { PageHeadSchema, PagePerfSchema } from './snapshot'
 
 const FixedEntrySchema = z.object({ fingerprint: z.string(), rule: z.string(), route: z.string() })
 
@@ -50,6 +50,8 @@ export const RouteResultSchema = z.object({
   }),
   /** Each render's head tags, for the SEO view. Absent in reports from before 0.4. */
   head: z.object({ ltr: PageHeadSchema.optional(), rtl: PageHeadSchema.optional() }).optional(),
+  /** Each language's load measurements, for the performance view. */
+  perf: z.object({ ltr: PagePerfSchema.optional(), rtl: PagePerfSchema.optional() }).optional(),
   findings: z.array(FindingSchema),
   errors: z.array(RouteErrorSchema),
 })
@@ -78,6 +80,17 @@ export const ReportSchema = z.object({
     baselined: z.number().int(),
     fixed: z.number().int(),
   }),
+  /** How pages were loaded for the performance check, when it ran. */
+  performance: z
+    .object({
+      engine: z.string(),
+      cpuSlowdown: z.number(),
+      network: z.string(),
+      runs: z.number().int(),
+      warmUp: z.number().int(),
+      budgets: z.record(z.string(), z.number()),
+    })
+    .optional(),
   routes: z.array(RouteResultSchema),
   fixed: z.array(FixedEntrySchema),
 })

@@ -5,7 +5,7 @@ export const SeveritySchema = z.enum(['info', 'warn', 'error'])
 export type Severity = z.infer<typeof SeveritySchema>
 
 /** What a rule checks. Each area has its own tab in the report and its own exit-code rules. */
-export const AreaSchema = z.enum(['localization', 'seo'])
+export const AreaSchema = z.enum(['localization', 'seo', 'performance'])
 export type Area = z.infer<typeof AreaSchema>
 
 export const FindingSchema = z.object({

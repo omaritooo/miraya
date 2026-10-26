@@ -20,6 +20,7 @@ import { applyBaseline, readBaseline } from './baseline'
 import { buildCrops, screenshotFrame } from './crops'
 import { loadTranslations } from './translations'
 import { pairSnapshots, type PairingStats } from './pair'
+import { canMeasure, measureRoute, NETWORK_NAMES } from './perf'
 import {
   openContexts,
   type Contexts,
@@ -119,6 +120,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
   const baselinePath = options.baseline ?? config.baseline
   const baseline = baselinePath === false ? undefined : readBaseline(resolve(baselinePath))
   const translations = loadTranslations(config)
+  const measuring = config.checks.includes('performance')
 
   const given = options.context?.browser() ?? options.browser
   const browser = given ?? (await chromium.launch({ headless: !options.headed }))
@@ -152,6 +154,18 @@ export async function audit(options: AuditOptions): Promise<Report> {
       }),
     )
 
+    const name = browser.browserType().name()
+    const engine = `${name[0]?.toUpperCase()}${name.slice(1)} ${browser.version().split('.')[0]}`
+    const performance: Report['performance'] = measuring
+      ? {
+          engine,
+          cpuSlowdown: config.performance.cpuSlowdown,
+          network: NETWORK_NAMES[config.performance.network],
+          runs: config.performance.runs,
+          warmUp: config.performance.warmUp,
+          budgets: config.performance.budgets,
+        }
+      : undefined
     const findings = results.flatMap((r) => r.findings)
     const count = (severity: Finding['severity']) =>
       findings.filter((f) => f.severity === severity).length
@@ -174,6 +188,7 @@ export async function audit(options: AuditOptions): Promise<Report> {
           baselined: 0,
           fixed: 0,
         },
+        ...(performance ? { performance } : {}),
         routes: results,
         fixed: [],
       },
@@ -275,12 +290,29 @@ export async function audit(options: AuditOptions): Promise<Report> {
               )
             }
           }
+          const perfNotes: string[] = []
+          if (measuring) {
+            for (const [dir, r] of [
+              ['ltr', ltr],
+              ['rtl', rtl],
+            ] as const) {
+              if (!r) continue
+              const context = contexts.forDir(dir)
+              if (!canMeasure(context)) {
+                if (dir === 'rtl')
+                  perfNotes.push('Performance needs Chromium, so it was not measured')
+                continue
+              }
+              r.snapshot.perf = await measureRoute(context, route, dir, config)
+            }
+          }
           const run = runRules(pair, resolved, config, crops, translations)
 
           const notes = [
             ...(ltr?.notes ?? []),
             ...rtl.notes,
             ...markerWarnings(rtl.markers, builtinRules),
+            ...perfNotes,
           ]
           for (const [dir, r] of [
             ['ltr', ltr],
@@ -316,11 +348,23 @@ export async function audit(options: AuditOptions): Promise<Report> {
               truncated: !!ltr?.snapshot.screenshot.truncated || rtl.snapshot.screenshot.truncated,
             },
             head: { ...(ltr ? { ltr: ltr.snapshot.head } : {}), rtl: rtl.snapshot.head },
+            ...(rtl.snapshot.perf || ltr?.snapshot.perf
+              ? {
+                  perf: {
+                    ...(ltr?.snapshot.perf ? { ltr: ltr.snapshot.perf } : {}),
+                    ...(rtl.snapshot.perf ? { rtl: rtl.snapshot.perf } : {}),
+                  },
+                }
+              : {}),
             findings: run.findings,
             errors: run.errors,
           }
         })(),
-        config.timeouts.routeMs,
+        // Each measured load gets the time a route gets, so slow throttled pages still finish.
+        config.timeouts.routeMs *
+          (measuring
+            ? 1 + (config.performance.runs + config.performance.warmUp) * (rtlOnly ? 1 : 2)
+            : 1),
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

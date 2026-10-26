@@ -1,6 +1,6 @@
-import type { Dir, Finding, PageHead, RuleContext, Severity, SnapshotPair } from '../../types'
+import type { Dir, PageHead, SnapshotPair } from '../../types'
 
-export const LANGUAGE: Record<Dir, string> = { ltr: 'English', rtl: 'Arabic' }
+export { LANGUAGE, report, type Issue } from '../page-findings'
 
 export type Side = { dir: Dir; head: PageHead; url: string; lang: string }
 
@@ -10,53 +10,6 @@ export function sides(pair: SnapshotPair): Side[] {
     const snap = pair[dir]
     return snap ? [{ dir, head: snap.head, url: snap.finalUrl, lang: snap.lang }] : []
   })
-}
-
-/** One problem on one render. `check` names it; equal checks on both renders become one finding. */
-export type Issue = {
-  check: string
-  message: string
-  evidence?: Record<string, string | number | boolean>
-  severity?: Severity
-}
-
-/**
- * Turns per-render issues into findings. The same check on English and Arabic is one
- * finding about both, so a site-wide template problem isn't counted twice per page.
- */
-export function report<O>(
-  pair: SnapshotPair,
-  ctx: RuleContext<O>,
-  rule: string,
-  selector: string,
-  issues: Partial<Record<Dir, Issue[]>>,
-): Finding[] {
-  const ltr = issues.ltr ?? []
-  const rtl = issues.rtl ?? []
-  const findings: Finding[] = []
-  const both = new Set(ltr.filter((i) => rtl.some((r) => r.check === i.check)).map((i) => i.check))
-  for (const [dir, list] of [
-    ['ltr', ltr],
-    ['rtl', rtl],
-  ] as const) {
-    for (const issue of list) {
-      const shared = both.has(issue.check)
-      if (shared && dir === 'rtl') continue
-      const side = shared ? 'both' : dir
-      findings.push(
-        ctx.finding({
-          rule,
-          route: pair.route,
-          selector,
-          boxes: {},
-          message: shared ? issue.message : `${LANGUAGE[dir]}: ${issue.message}`,
-          evidence: { check: issue.check, side, ...issue.evidence },
-          ...(issue.severity ? { severity: issue.severity } : {}),
-        }),
-      )
-    }
-  }
-  return findings
 }
 
 /** URL without its hash and trailing slash, for comparing links with pages. */

@@ -18,6 +18,7 @@ import {
 } from './data'
 import { Inspector, type Tab } from './Inspector'
 import { Segmented, SeverityCounts } from './ui'
+import { PerfStage, seconds } from './PerfStage'
 import { SeoStage } from './SeoStage'
 import { Stage } from './Stage'
 
@@ -87,7 +88,9 @@ function Report({
     (a) =>
       a.id === 'localization' ||
       a.id === filters.area ||
-      report.routes.some((r) => r.head || r.findings.some((f) => areaOf(f) === a.id)),
+      (a.id === 'seo' && report.routes.some((r) => r.head)) ||
+      (a.id === 'performance' && !!report.performance) ||
+      report.routes.some((r) => r.findings.some((f) => areaOf(f) === a.id)),
   )
   const visible = useMemo(
     () => (route ? route.findings.filter((f) => matches(f, filters)) : []),
@@ -133,7 +136,7 @@ function Report({
 
   return (
     <div className="app">
-      <a className="skip" href="#findings">
+      <a className="skip" href="#inspector">
         Skip to findings
       </a>
       <header className="topbar">
@@ -223,7 +226,15 @@ function Report({
         />
         {route ? (
           <>
-            {filters.area === 'seo' ? (
+            {filters.area === 'performance' ? (
+              <PerfStage
+                route={route}
+                report={report}
+                findings={visible}
+                images={images}
+                viewportWidth={report.config.viewport.w}
+              />
+            ) : filters.area === 'seo' ? (
               <SeoStage
                 route={route}
                 findings={visible}
@@ -325,7 +336,13 @@ function Pages({
 }) {
   const [query, setQuery] = useState('')
   const [showClean, setShowClean] = useState(false)
-  const shown = report.routes.filter((r) => r.route.toLowerCase().includes(query.toLowerCase()))
+  const perf = filters.area === 'performance'
+  // The slower of the two languages' largest paints.
+  const lcp = (r: RouteResult) =>
+    Math.max(...(['ltr', 'rtl'] as const).map((d) => r.perf?.[d]?.lcp?.ms ?? -1))
+  const shown = report.routes
+    .filter((r) => r.route.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => (perf ? lcp(b) - lcp(a) : 0))
   const scoped = (r: RouteResult) => r.findings.filter((f) => areaOf(f) === filters.area)
   const isClean = (r: RouteResult) => r.status === 'ok' && !worst(scoped(r))
   const clean = shown.filter(isClean)
@@ -378,6 +395,11 @@ function Pages({
                 </bdi>
                 {failed ? (
                   <span className="page-count sev-error">failed</span>
+                ) : perf && lcp(r) >= 0 ? (
+                  <span className="page-count">
+                    <span className="sr">largest paint </span>
+                    {seconds(lcp(r))}
+                  </span>
                 ) : open.length ? (
                   <span className="page-count">
                     {open.length}
@@ -407,6 +429,9 @@ function Pages({
         ) : null}
         {shown.length === 0 ? <li className="page-none">No page matches “{query}”.</li> : null}
       </ul>
+      {perf && report.performance ? (
+        <p className="caption">Sorted by the slower of the two largest paints.</p>
+      ) : null}
 
       {report.fixed.length > 0 ? (
         <>
@@ -432,6 +457,24 @@ function Pages({
         </>
       ) : null}
 
+      {perf && report.performance ? (
+        <>
+          <h2 className="overline">Conditions</h2>
+          <dl className="run">
+            <dt>CPU</dt>
+            <dd>{report.performance.cpuSlowdown}× slowdown</dd>
+            <dt>Network</dt>
+            <dd>{report.performance.network}</dd>
+            <dt>Engine</dt>
+            <dd>{report.performance.engine}</dd>
+            <dt>Runs</dt>
+            <dd>
+              Median of {report.performance.runs}
+              {report.performance.warmUp ? `, ${report.performance.warmUp} warm-up` : ''}
+            </dd>
+          </dl>
+        </>
+      ) : null}
       <h2 className="overline">Run</h2>
       <dl className="run">
         <dt>Engine</dt>

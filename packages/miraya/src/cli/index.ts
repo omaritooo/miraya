@@ -233,7 +233,7 @@ program
   .option('-o, --out <dir>', 'output folder', '.miraya')
   .option('--format <list>', 'json,html,github; github is added on GitHub Actions', 'json,html')
   .option('--rule <id...>', 'run only these rules')
-  .option('--checks <list>', 'areas to check, comma-separated: localization,seo')
+  .option('--checks <list>', 'areas to check, comma-separated: localization,seo,performance')
   .option('--rtl-only', 'skip the LTR render and the rules that need it')
   .addOption(
     new Option('--concurrency <n>', 'routes audited in parallel').argParser((v) => Number(v)),

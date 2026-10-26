@@ -9,6 +9,7 @@ import ltrInputs from './ltr-inputs'
 import mixedDigits from './mixed-digits'
 import notMirrored from './not-mirrored'
 import untranslatedText from './untranslated-text'
+import { performanceRules } from './performance'
 import { seoRules } from './seo'
 
 export { defineRule } from './util'
@@ -26,4 +27,5 @@ export const builtinRules = [
   ltrInputs,
   mixedDigits,
   ...seoRules,
+  ...performanceRules,
 ] as Rule<unknown>[]

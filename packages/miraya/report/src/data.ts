@@ -1,6 +1,15 @@
-import type { Area, Finding, PageHead, Report, RouteResult, Severity } from '../../src/types'
+import type {
+  Area,
+  Finding,
+  PageHead,
+  PagePerf,
+  Report,
+  ResourceType,
+  RouteResult,
+  Severity,
+} from '../../src/types'
 
-export type { Area, Finding, PageHead, Report, RouteResult, Severity }
+export type { Area, Finding, PageHead, PagePerf, Report, ResourceType, RouteResult, Severity }
 
 /** What core/report.ts inlines into the page. */
 export type ReportData = {
@@ -16,6 +25,7 @@ export type Status = (typeof STATUSES)[number]
 export const AREAS: { id: Area; label: string }[] = [
   { id: 'localization', label: 'Localization' },
   { id: 'seo', label: 'SEO' },
+  { id: 'performance', label: 'Performance' },
 ]
 /** Reports from before areas existed only have localization findings. */
 export const areaOf = (f: Finding): Area => f.area ?? 'localization'

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>الأداء · ميرايا</title>
+    <link rel="stylesheet" href="/src/site.css" />
+    <script>
+      // Holds up the first paint: the heading draws late (lcp-budget).
+      for (const start = performance.now(); performance.now() - start < 2600; );
+    </script>
+  </head>
+  <body>
+    <main class="shell">
+      <h1 data-testid="hero">خطط تنمو مع فريقك</h1>
+      <p>المبتدئ والفريق والأعمال.</p>
+      <!-- Drawn at 100 px, served at 400 (oversized-images). -->
+      <img data-testid="photo" src="/perf/photo.bmp?w=400" width="100" height="75" alt="" />
+    </main>
+    <script>
+      setTimeout(() => {
+        // A banner that arrives late and pushes the page down (cls-budget).
+        const banner = document.createElement('div')
+        banner.style.height = '480px'
+        banner.textContent = 'عرض خاص'
+        document.body.prepend(banner)
+        // A long task after the first paint (tbt-budget).
+        for (const start = performance.now(); performance.now() - start < 400; );
+      }, 300)
+    </script>
+  </body>
+</html>

@@ -110,6 +110,26 @@ export const ConfigSchema = z.object({
   source: z.object({ attribute: z.string().optional() }).prefault({}),
   /** The areas to check. Rules of an area left out don't run. */
   checks: z.array(AreaSchema).min(1).default(['localization', 'seo']),
+  /** How pages load for the performance check, and the budgets they're held to. */
+  performance: z
+    .object({
+      /** Measured loads per page and language; the median counts. */
+      runs: z.number().int().min(1).max(9).default(3),
+      /** Loads before measuring, so a dev server's first compile doesn't count. */
+      warmUp: z.number().int().min(0).max(3).default(1),
+      cpuSlowdown: z.number().min(1).max(20).default(4),
+      network: z.enum(['fast-4g', 'slow-4g', 'none']).default('fast-4g'),
+      budgets: z
+        .object({
+          lcpMs: z.number().default(2500),
+          cls: z.number().default(0.1),
+          tbtMs: z.number().default(200),
+          scriptKb: z.number().default(300),
+          renderBlocking: z.number().int().default(0),
+        })
+        .prefault({}),
+    })
+    .prefault({}),
   rules: z.record(z.string(), RuleSettingSchema).default({}),
   /** Opt-in experimental rule ids. */
   experimental: z.array(z.string()).default([]),

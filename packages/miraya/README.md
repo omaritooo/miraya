@@ -1,6 +1,6 @@
 # Miraya
 
-Finds the bugs that only exist in the right-to-left version of your web app, and checks the SEO of both languages.
+Finds the bugs that only exist in the right-to-left version of your web app, and checks the SEO and load speed of both languages.
 
 Miraya opens each page twice in a real browser, once in English (LTR) and once in Arabic (RTL), pairs up the elements between the two, and reports what broke when the page flipped: a sidebar that stayed on the left, a back arrow pointing the wrong way, Arabic drawn in a fallback font, text cut off, English left untranslated.
 
@@ -85,7 +85,8 @@ Everything except `baseUrl` is optional.
 | `allow.latinText`         | `[]`                        | Brand and product names that stay in English.                                                                                                                                                                       |
 | `locales`                 |                             | `{ ltr: './locales/en.json', rtl: './locales/ar.json' }`: your translation files, so untranslated text names its key and the file to edit. See [Translation files](#translation-files).                             |
 | `source.attribute`        |                             | An attribute holding the source location (`src/Nav.vue:12`), shown with each finding.                                                                                                                               |
-| `checks`                  | `['localization', 'seo']`   | The areas to check. `--checks localization` runs one area for a single audit.                                                                                                                                       |
+| `checks`                  | `['localization', 'seo']`   | The areas to check: `localization`, `seo` and `performance`. `--checks localization` runs one area for a single audit.                                                                                              |
+| `performance`             |                             | How pages load for the performance check, and its budgets. See [Performance](#performance).                                                                                                                         |
 | `rules`                   | `{}`                        | `{ 'mixed-digits': 'off', 'not-mirrored': ['warn', { tolerancePx: 8 }] }`                                                                                                                                           |
 | `experimental`            | `[]`                        | Experimental rules to switch on, such as `'bidi-isolation'`.                                                                                                                                                        |
 | `baseline`                | `'.miraya-baseline.json'`   | Where accepted findings are stored. `false` turns baselines off.                                                                                                                                                    |
@@ -350,6 +351,69 @@ Chat apps and social networks draw shared links from the Open Graph tags. Withou
 JSON-LD (`<script type="application/ld+json">`) describes a page to search engines: a product, an article, an organisation. A block that isn't valid JSON is ignored, and one without `@type` says nothing.
 
 **Fix:** make each block valid JSON with an `@type`, and check it with a structured data validator.
+
+## Performance
+
+Miraya loads each page in both languages again, in Chromium with the cache off and the CPU and network slowed down, and measures how fast it draws. The Arabic page is often the slower one: Arabic web fonts are several times the size of Latin ones, and a page that waits for its font paints late. The report's Performance tab shows both languages against the budgets, the element that painted last, and where the bytes go.
+
+It's off by default, because it loads each page several more times. Switch it on with `checks: ['localization', 'seo', 'performance']`, or `--checks localization,seo,performance` for one run.
+
+| Rule                                    | Default | Finds                                                  |
+| --------------------------------------- | ------- | ------------------------------------------------------ |
+| [`lcp-budget`](#lcp-budget)             | error   | The largest element paints later than `budgets.lcpMs`  |
+| [`cls-budget`](#cls-budget)             | warn    | Layout shift over `budgets.cls`                        |
+| [`tbt-budget`](#tbt-budget)             | warn    | Scripts block the page for longer than `budgets.tbtMs` |
+| [`js-budget`](#js-budget)               | warn    | More JavaScript than `budgets.scriptKb`                |
+| [`render-blocking`](#render-blocking)   | warn    | More files holding up the first paint than allowed     |
+| [`oversized-images`](#oversized-images) | info    | Images served larger than they're drawn                |
+
+```ts
+performance: {
+  runs: 3, // measured loads per page and language; the median counts
+  warmUp: 1, // loads before measuring, so a dev server's first compile doesn't count
+  cpuSlowdown: 4,
+  network: 'fast-4g', // or 'slow-4g', or 'none'
+  budgets: { lcpMs: 2500, cls: 0.1, tbtMs: 200, scriptKb: 300, renderBlocking: 0 },
+}
+```
+
+The defaults follow Core Web Vitals' "good" thresholds, under Chrome DevTools' Fast 4G preset. Numbers from a development server are slower and noisier than production; set budgets against a production build. A metric over budget in both languages is one finding, and its fingerprint doesn't change with the numbers, so a baseline keeps holding it as they move.
+
+### `lcp-budget`
+
+Largest Contentful Paint: when the biggest heading, image or text block in the first view finished drawing. The finding outlines that element on the screenshot.
+
+**Fix:** find what the element waits for: a web font, a hero image or a script before it. Preload it, make it smaller, or let it draw first in a fallback font (`font-display: swap`). For Arabic fonts, a `unicode-range` subset of the Arabic block is often a fraction of the full file.
+
+### `cls-budget`
+
+Cumulative Layout Shift: how much the page moves while it loads, counted in the worst five-second window.
+
+**Fix:** reserve space for what arrives late: `width` and `height` on images, a `min-height` on banners and embeds, and fallback-font metrics (`size-adjust`) that match the web font.
+
+### `tbt-budget`
+
+Total Blocking Time: how long, after the first paint, scripts kept the page from responding to a tap, counting each task's time past 50 ms.
+
+**Fix:** split long tasks, defer scripts the first view doesn't need, and move heavy work off the main thread.
+
+### `js-budget`
+
+The JavaScript the page downloads, compressed, as it crosses the network.
+
+**Fix:** split the bundle by route, load rarely used features on demand, and look for duplicate or oversized dependencies.
+
+### `render-blocking`
+
+Stylesheets and scripts in the `<head>` that the browser must load before it draws anything. Allowed: `budgets.renderBlocking` (0).
+
+**Fix:** inline the CSS the first view needs and load the rest later; add `defer` or `async` to scripts in the head.
+
+### `oversized-images`
+
+Images whose file is larger than the space they're drawn in, by at least 4 KB of wasted bytes.
+
+**Fix:** serve each image at the size it's drawn, with `srcset` and `sizes` for different screens.
 
 ## Using it from code
 

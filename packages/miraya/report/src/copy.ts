@@ -38,6 +38,30 @@ const RULES: Record<string, { title: string; fix: string }> = {
     title: 'The page mixes two kinds of digits',
     fix: 'Format every number with one locale, for example Intl.NumberFormat("ar-EG") everywhere.',
   },
+  'lcp-budget': {
+    title: 'The largest element paints too late',
+    fix: 'Find what the element waits for: a web font, a hero image or a script before it. Preload it, make it smaller, or let the element draw first with a fallback.',
+  },
+  'cls-budget': {
+    title: 'The page moves while it loads',
+    fix: 'Reserve space for what arrives late: width and height on images, a min-height on banners and embeds, and font metrics that match the fallback.',
+  },
+  'tbt-budget': {
+    title: 'Scripts keep the page from responding',
+    fix: 'Split long tasks, defer scripts the first view does not need, and move heavy work off the main thread.',
+  },
+  'js-budget': {
+    title: 'The page loads too much JavaScript',
+    fix: 'Split the bundle by route, load rarely used features on demand, and check for duplicate or oversized dependencies.',
+  },
+  'render-blocking': {
+    title: 'Files hold up the first paint',
+    fix: 'Inline the CSS the first view needs and load the rest later; add defer or async to scripts in the head.',
+  },
+  'oversized-images': {
+    title: 'Images are larger than they are drawn',
+    fix: 'Serve each image at the size it is drawn, with srcset and sizes for different screens.',
+  },
   'page-title': {
     title: 'The title is missing, too long or untranslated',
     fix: 'Give every page its own <title> in its own language, under 60 characters, with the most specific words first.',
@@ -120,6 +144,12 @@ export const SIDE_WORDS: Record<string, string> = {
 /** Evidence keys in plain words. Keys without an entry keep their own name. */
 const EVIDENCE: Record<string, string> = {
   check: 'What failed',
+  budget: 'Budget',
+  ltr: 'English',
+  rtl: 'Arabic',
+  element: 'Element',
+  resource: 'Waits for',
+  wastedKb: 'Wasted (KB)',
   startL: 'Gap before it, in English',
   endR: 'The same gap, in Arabic',
   endL: 'Gap after it, in English',
