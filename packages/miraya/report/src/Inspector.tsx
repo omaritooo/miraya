@@ -189,6 +189,9 @@ function StatusTag({ finding }: { finding: Finding }) {
   )
 }
 
+// Selectors, URLs and CSS read better in code font; words and numbers don't.
+const CODE_LIKE = /[[\]#>:/(){}=]|^[\w-]+\.[\w-]/
+
 // Facts that have their own rows, so the measurements table skips them.
 const SHOWN_ABOVE = new Set(['text', 'translation', 'translationKey', 'translationFile'])
 const MATCH_WORDS: Record<string, string> = {
@@ -315,11 +318,13 @@ function Detail({ finding }: { finding: Finding }) {
                 <tr key={key}>
                   <th scope="row">{evidenceLabel(key)}</th>
                   <td dir="ltr">
-                    <code>
-                      {key === 'side'
-                        ? (SIDE_WORDS[String(value)] ?? String(value))
-                        : String(value)}
-                    </code>
+                    {key === 'side' ? (
+                      (SIDE_WORDS[String(value)] ?? String(value))
+                    ) : CODE_LIKE.test(String(value)) ? (
+                      <code>{String(value)}</code>
+                    ) : (
+                      String(value)
+                    )}
                   </td>
                 </tr>
               ))}
