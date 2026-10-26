@@ -9,7 +9,15 @@ const TITLE_MAX = 60
 const DESCRIPTION_MAX = 160
 
 /** One row per tag group, with the rule that checks it. */
-const ROWS: { tag: string; rule: string; cell: (head: PageHead, dir: Dir) => ReactNode }[] = [
+/** This side's findings of the row's rule: the cell notes what's wrong next to the value. */
+type Own = Finding[]
+const onSide = (f: Finding, dir: Dir) => f.evidence.side === dir || f.evidence.side === 'both'
+
+const ROWS: {
+  tag: string
+  rule: string
+  cell: (head: PageHead, dir: Dir, own: Own) => ReactNode
+}[] = [
   {
     tag: 'title',
     rule: 'page-title',
@@ -29,16 +37,28 @@ const ROWS: { tag: string; rule: string; cell: (head: PageHead, dir: Dir) => Rea
   {
     tag: 'canonical',
     rule: 'canonical',
-    cell: (head) =>
-      head.canonical.length ? (
-        head.canonical.map((href) => (
-          <code key={href} className="url" dir="ltr">
-            {href}
-          </code>
-        ))
-      ) : (
-        <Missing>missing</Missing>
-      ),
+    cell: (head, _dir, own) => {
+      const twin = own.find((f) => f.evidence.check === 'points-at-twin')
+      return (
+        <>
+          {head.canonical.length ? (
+            head.canonical.map((href) => (
+              <code key={href} className={`url${twin ? ' sev-error' : ''}`} dir="ltr">
+                {href}
+              </code>
+            ))
+          ) : (
+            <Missing>missing</Missing>
+          )}
+          {twin ? (
+            <span className="cell-note sev-error" lang="en" dir="ltr">
+              Points at the other language’s page. Expected{' '}
+              <code className="url">{path(String(twin.evidence.expected))}</code>
+            </span>
+          ) : null}
+        </>
+      )
+    },
   },
   {
     tag: 'robots',
@@ -54,16 +74,35 @@ const ROWS: { tag: string; rule: string; cell: (head: PageHead, dir: Dir) => Rea
   {
     tag: 'hreflang',
     rule: 'hreflang',
-    cell: (head) =>
-      head.alternates.length ? (
-        head.alternates.map((a) => (
-          <span key={`${a.hreflang}${a.href}`} dir="ltr" className="pair">
-            <code>{a.hreflang}</code> → <code className="url">{path(a.href)}</code>
-          </span>
-        ))
+    cell: (head, _dir, own) => {
+      const checks = new Set(own.map((f) => String(f.evidence.check)))
+      // A tick when the link checks out: nothing is wrong with the language links on this side.
+      const fine = !['wrong-twin', 'no-twin', 'twin-lang', 'lang-mismatch'].some((c) =>
+        checks.has(c),
+      )
+      return head.alternates.length ? (
+        <>
+          {head.alternates.map((a) => (
+            <span key={`${a.hreflang}${a.href}`} dir="ltr" className="pair">
+              <code>{a.hreflang}</code> → <code className="url">{path(a.href)}</code>
+              {fine ? (
+                <span className="pos" aria-label="correct">
+                  {' '}
+                  ✓
+                </span>
+              ) : null}
+            </span>
+          ))}
+          {checks.has('no-x-default') ? (
+            <span className="cell-note sev-info" lang="en" dir="ltr">
+              no <code>x-default</code>
+            </span>
+          ) : null}
+        </>
       ) : (
         <Missing>none</Missing>
-      ),
+      )
+    },
   },
   {
     tag: 'h1',
@@ -262,7 +301,15 @@ export function SeoStage({
                           const head = route.head?.[dir]
                           return (
                             <td key={dir} {...(dir === 'rtl' ? { lang: 'ar', dir: 'rtl' } : {})}>
-                              <div className="cell">{head ? row.cell(head, dir) : null}</div>
+                              <div className="cell">
+                                {head
+                                  ? row.cell(
+                                      head,
+                                      dir,
+                                      own.filter((f) => onSide(f, dir)),
+                                    )
+                                  : null}
+                              </div>
                             </td>
                           )
                         })}

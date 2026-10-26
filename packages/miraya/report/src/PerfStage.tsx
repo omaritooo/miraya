@@ -59,17 +59,17 @@ const ROWS = (b: Budgets | undefined): Row[] => [
     unit: 'KB',
   },
   {
+    label: 'Page weight',
+    value: (p) => kb(total(p)),
+    show: num,
+    unit: 'KB',
+  },
+  {
     label: 'Render-blocking',
     rule: 'render-blocking',
     budget: b?.renderBlocking,
     value: (p) => p.renderBlocking.length,
     show: num,
-  },
-  {
-    label: 'Page weight',
-    value: (p) => kb(total(p)),
-    show: num,
-    unit: 'KB',
   },
 ]
 
@@ -80,7 +80,6 @@ export const TYPES: { id: ResourceType; label: string }[] = [
   { id: 'style', label: 'Styles' },
   { id: 'font', label: 'Fonts' },
   { id: 'image', label: 'Images' },
-  { id: 'document', label: 'Document' },
   { id: 'other', label: 'Other' },
 ]
 
@@ -160,51 +159,42 @@ export function PerfStage({
           </p>
         ) : (
           <>
-            <div className="table-box">
-              <table className={`metrics${dev ? ' dev' : ''}`}>
-                <caption className="sr">Metrics against budget</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Metric</th>
+            <div
+              role="table"
+              aria-label="Metrics against budget"
+              className={`metric-cards${dev ? ' dev' : ''}`}
+            >
+              {rows.map((row) => {
+                const finding = row.rule ? findings.find((f) => f.rule === row.rule) : undefined
+                return (
+                  <div role="row" className="metric-card" key={row.label}>
+                    <div role="rowheader" className="metric-head">
+                      <span className="metric-name">{row.label}</span>
+                      <span className="muted">
+                        {row.budget === undefined
+                          ? 'no budget'
+                          : row.rule === 'render-blocking'
+                            ? row.show(row.budget)
+                            : `≤ ${row.show(row.budget)}${row.unit ? ` ${row.unit}` : ''}`}
+                      </span>
+                    </div>
                     {dirs.map((d) => (
-                      <th scope="col" key={d}>
-                        {LANGUAGES[d].name}
-                      </th>
+                      <MetricCell
+                        key={d}
+                        row={row}
+                        perf={route.perf?.[d]}
+                        other={
+                          measured.length > 1
+                            ? route.perf?.[d === 'ltr' ? 'rtl' : 'ltr']
+                            : undefined
+                        }
+                        dir={d}
+                        severity={finding?.severity}
+                      />
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const finding = row.rule ? findings.find((f) => f.rule === row.rule) : undefined
-                    return (
-                      <tr key={row.label}>
-                        <th scope="row">
-                          <span className="metric-name">{row.label}</span>
-                          <span className="metric-budget muted">
-                            {row.budget === undefined
-                              ? 'no budget'
-                              : `≤ ${row.show(row.budget)}${row.unit ? ` ${row.unit}` : ''}`}
-                          </span>
-                        </th>
-                        {dirs.map((d) => (
-                          <MetricCell
-                            key={d}
-                            row={row}
-                            perf={route.perf?.[d]}
-                            other={
-                              measured.length > 1
-                                ? route.perf?.[d === 'ltr' ? 'rtl' : 'ltr']
-                                : undefined
-                            }
-                            dir={d}
-                            severity={finding?.severity}
-                          />
-                        ))}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                  </div>
+                )
+              })}
             </div>
             <AlsoMeasured
               perf={dirs.map((d) => route.perf?.[d]).filter((p): p is PagePerf => !!p)}
@@ -254,9 +244,10 @@ function MetricCell({
   const value = perf ? row.value(perf) : undefined
   if (value === undefined) {
     return (
-      <td>
+      <div role="cell" className="metric-cell">
+        <span className="metric-lang">{LANGUAGES[dir].short}</span>
         <span className="muted">not measured</span>
-      </td>
+      </div>
     )
   }
   const over = row.budget !== undefined && value > row.budget
@@ -264,23 +255,24 @@ function MetricCell({
   // Without a budget, how much heavier one language is than the other is the useful part.
   const vsOther =
     row.budget === undefined && theirs && dir === 'rtl' && value > theirs * 1.1
-      ? `+${Math.round((value / theirs - 1) * 100)}% over English`
+      ? `+${Math.round((value / theirs - 1) * 100)}%`
       : ''
+  const sev = severity ?? 'warn'
   return (
-    <td className={over ? `row-${severity ?? 'warn'}` : undefined}>
-      <span className="metric-lang muted" aria-hidden="true">
+    <div role="cell" className="metric-cell">
+      <span className="metric-lang">
         {LANGUAGES[dir].short}
+        <span className="sr"> {LANGUAGES[dir].name}</span>
       </span>
-      <span className="metric-value">{row.show(value)}</span>
-      {row.unit ? <span className="muted"> {row.unit}</span> : null}{' '}
+      <span className={`metric-value${over ? ` sev-${sev}` : ''}`}>{row.show(value)}</span>
       {row.budget === undefined ? (
-        vsOther ? (
-          <span className="metric-note muted">{vsOther}</span>
-        ) : null
+        <span className="metric-unit">
+          {row.unit}
+          {vsOther ? `, ${vsOther}` : ''}
+        </span>
       ) : over ? (
-        <span className={`metric-note sev-${severity ?? 'warn'}`}>
-          <span aria-hidden="true">{GLYPHS[severity ?? 'warn']}</span> +
-          {row.show(value - row.budget)}
+        <span className={`metric-note sev-${sev}`}>
+          <span aria-hidden="true">{GLYPHS[sev]}</span> +{row.show(value - row.budget)}
           <span className="sr"> over budget</span>
         </span>
       ) : (
@@ -288,7 +280,7 @@ function MetricCell({
           <span aria-hidden="true">✓</span> under
         </span>
       )}
-    </td>
+    </div>
   )
 }
 
@@ -318,6 +310,38 @@ const file = (url: string) => {
   }
 }
 
+const CROP_HEIGHT = 220
+
+/**
+ * Where to draw the screenshot so the element is large and in view. A small element is
+ * shown whole and centred; a wide one, like a full-width heading, at up to its real size,
+ * from the side its text starts on.
+ */
+function cropAround(
+  box: { x: number; y: number; w: number; h: number },
+  frame: { x: number; w: number },
+  width: number,
+  height: number,
+  dir: Dir,
+) {
+  const fits = Math.min((width * 0.9) / box.w, (height * 0.6) / box.h)
+  const scale = Math.min(1, Math.max(fits, (height * 0.3) / box.h, width / frame.w))
+  const b = { x: (box.x - frame.x) * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale }
+  const left =
+    b.w <= width - 24
+      ? (width - b.w) / 2 - b.x
+      : dir === 'rtl'
+        ? width - 12 - (b.x + b.w)
+        : 12 - b.x
+  const top = (height - b.h) / 2 - b.y
+  return {
+    imageWidth: frame.w * scale,
+    left,
+    top,
+    box: { x: b.x + left, y: b.y + top, w: b.w, h: b.h },
+  }
+}
+
 /** The screenshot around the largest paint element, outlined. */
 function LargestPaint({
   dir,
@@ -332,15 +356,17 @@ function LargestPaint({
   src: string
   frame: { x: number; w: number }
 }) {
-  const scroller = useRef<HTMLDivElement>(null)
-  const [docHeight, setDocHeight] = useState(0)
+  const shot = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
   const box = perf.lcp?.box
   useEffect(() => {
-    const el = scroller.current
-    if (!el || !box || !docHeight) return
-    const scale = el.clientWidth / frame.w
-    el.scrollTop = Math.max(0, box.y * scale - el.clientHeight / 3)
-  }, [box, docHeight, frame.w])
+    const el = shot.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const crop = box && width ? cropAround(box, frame, width, CROP_HEIGHT, dir) : undefined
   const lang = LANGUAGES[dir].name
   const blocking = perf.renderBlocking.filter((r) => r.type === 'font' || r.type === 'style')
   return (
@@ -351,32 +377,29 @@ function LargestPaint({
       {perf.lcp ? (
         <>
           {src && box ? (
-            <div className="lcp-shot" ref={scroller}>
-              <div className="lcp-canvas">
-                <img
-                  src={src}
-                  alt={`${lang} render with the largest paint element outlined`}
-                  onLoad={(e) => {
-                    const img = e.currentTarget
-                    setDocHeight((img.naturalHeight * frame.w) / img.naturalWidth)
-                  }}
-                />
-                {docHeight ? (
+            <div className="lcp-shot" ref={shot} style={{ blockSize: CROP_HEIGHT }}>
+              {crop ? (
+                <>
+                  <img
+                    src={src}
+                    alt={`${lang} render, cropped to the largest paint element`}
+                    style={{ inlineSize: crop.imageWidth, left: crop.left, top: crop.top }}
+                  />
                   <span
                     className="lcp-box"
                     style={{
-                      left: `${((box.x - frame.x) / frame.w) * 100}%`,
-                      top: `${(box.y / docHeight) * 100}%`,
-                      width: `${(box.w / frame.w) * 100}%`,
-                      height: `${(box.h / docHeight) * 100}%`,
+                      left: crop.box.x,
+                      top: crop.box.y,
+                      width: crop.box.w,
+                      height: crop.box.h,
                     }}
                   >
                     <span className="lcp-label" dir="ltr">
                       LCP {num(perf.lcp.ms)} ms
                     </span>
                   </span>
-                ) : null}
-              </div>
+                </>
+              ) : null}
             </div>
           ) : null}
           <p>
@@ -424,9 +447,13 @@ function LargestPaint({
   )
 }
 
+/** Bytes of a type; the document counts as other, as in the design. */
+const bytesOf = (p: PagePerf, type: ResourceType) =>
+  type === 'other' ? p.bytes.other + p.bytes.document : p.bytes[type]
+
 function Weight({ perf, dirs }: { perf: NonNullable<RouteResult['perf']>; dirs: Dir[] }) {
   const max = Math.max(...dirs.map((d) => total(perf[d] as PagePerf)))
-  const types = TYPES.filter((t) => dirs.some((d) => (perf[d]?.bytes[t.id] ?? 0) > 0))
+  const types = TYPES.filter((t) => dirs.some((d) => (perf[d] ? bytesOf(perf[d], t.id) : 0) > 0))
   return (
     <section className="perf-panel" aria-labelledby="weight-title">
       <h2 id="weight-title" className="seo-h2">
@@ -447,12 +474,12 @@ function Weight({ perf, dirs }: { perf: NonNullable<RouteResult['perf']>; dirs: 
               style={{ width: `${(sum / max) * 100}%` }}
             >
               {types.map((t) =>
-                p.bytes[t.id] ? (
+                bytesOf(p, t.id) ? (
                   <span
                     key={t.id}
                     className={`weight-${t.id}`}
-                    style={{ flexGrow: p.bytes[t.id] }}
-                    title={`${t.label} ${num(kb(p.bytes[t.id]))} KB`}
+                    style={{ flexGrow: bytesOf(p, t.id) }}
+                    title={`${t.label} ${num(kb(bytesOf(p, t.id)))} KB`}
                   />
                 ) : null,
               )}
@@ -480,7 +507,7 @@ function Weight({ perf, dirs }: { perf: NonNullable<RouteResult['perf']>; dirs: 
                 {t.label}
               </th>
               {dirs.map((d) => (
-                <td key={d}>{num(kb(perf[d]?.bytes[t.id] ?? 0))}</td>
+                <td key={d}>{num(kb(perf[d] ? bytesOf(perf[d], t.id) : 0))}</td>
               ))}
             </tr>
           ))}

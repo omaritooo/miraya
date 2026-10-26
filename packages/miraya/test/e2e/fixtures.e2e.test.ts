@@ -183,7 +183,7 @@ describe('performance', () => {
     const page = await context.newPage()
     try {
       await page.goto(`${pathToFileURL(file).href}#area=performance`)
-      await expect.poll(() => page.locator('.metrics tbody tr').count()).toBe(6)
+      await expect.poll(() => page.locator('.metric-card').count()).toBe(6)
       await expect.poll(() => page.locator('.lcp-box').count()).toBe(1)
       await page.getByRole('tab', { name: /Requests/ }).click()
       await expect.poll(() => page.locator('#panel-requests tbody tr').count()).toBeGreaterThan(3)
@@ -265,7 +265,7 @@ describe('HTML report', () => {
         .getByRole('button', { name: /not-mirrored.*sidebar/ })
         .first()
         .click()
-      await expect.poll(() => page.locator('.evidence').textContent()).toContain('What failed')
+      await expect.poll(() => page.locator('.evidence').textContent()).toContain('gapToStart')
       expect(new URL(page.url()).hash).toContain('finding=')
       // A filtered view survives a reload, because the filters live in the hash.
       await page.getByRole('link', { name: /not-mirrored\/good/ }).click()

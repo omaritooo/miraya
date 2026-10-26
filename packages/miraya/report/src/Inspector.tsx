@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   elementLabel,
-  evidenceLabel,
   GLYPHS,
+  headline,
   ruleFix,
-  ruleTitle,
   SEVERITY_WORDS,
   SIDE_WORDS,
   TRANSLATION_STATUS,
@@ -115,6 +114,8 @@ function Findings({
   const inArea = route.findings.filter((f) => inView(f, area))
   const hidden = inArea.length - findings.length
   const list = useRef<HTMLOListElement>(null)
+  // Numbers match the outlines on the screenshots; SEO and performance have none.
+  const numbered = area === 'localization' || area === 'cross-browser'
 
   // Keep the selected row in view as j / k move through a long list.
   useEffect(() => {
@@ -161,7 +162,7 @@ function Findings({
               aria-pressed={f === selected}
               onClick={() => onSelect(f.id)}
             >
-              <span className="finding-number">{n + 1}</span>
+              {numbered ? <span className="finding-number">{n + 1}</span> : null}
               <span className="glyph" aria-hidden="true">
                 {GLYPHS[f.severity]}
               </span>
@@ -190,7 +191,72 @@ function StatusTag({ finding }: { finding: Finding }) {
 }
 
 // Facts that have their own rows, so the measurements table skips them.
-const SHOWN_ABOVE = new Set(['text', 'translation', 'translationKey', 'translationFile'])
+// check and side name the finding; the tags and heading already say them.
+const SHOWN_ABOVE = new Set([
+  'text',
+  'translation',
+  'translationKey',
+  'translationFile',
+  'check',
+  'side',
+])
+
+type Measure = { key: string; en?: unknown; ar?: unknown; one?: unknown; off?: 'en' | 'ar' }
+
+/** Gap names for the L / R evidence pairs, as the design writes them. */
+const STEMS: Record<string, string> = { start: 'gapToStart', end: 'gapToEnd' }
+
+/**
+ * Evidence as rows. A value measured in both languages (fooL and fooR, or ltr and rtl)
+ * is one row with an English and an Arabic column; anything else spans both.
+ */
+function measurementRows(evidence: Finding['evidence']): Measure[] {
+  const keys = Object.keys(evidence).filter((k) => !SHOWN_ABOVE.has(k))
+  const used = new Set<string>()
+  const rows: Measure[] = []
+  if ('ltr' in evidence || 'rtl' in evidence) {
+    const budget = Number(evidence.budget)
+    const over = (v: unknown) => typeof v === 'number' && Number.isFinite(budget) && v > budget
+    rows.push({
+      key: 'measured',
+      en: evidence.ltr,
+      ar: evidence.rtl,
+      ...(over(evidence.rtl)
+        ? { off: 'ar' as const }
+        : over(evidence.ltr)
+          ? { off: 'en' as const }
+          : {}),
+    })
+    used.add('ltr').add('rtl')
+  }
+  for (const key of keys) {
+    if (used.has(key)) continue
+    const m = key.match(/^(.+)([LR])$/)
+    const twin = m ? `${m[1]}${m[2] === 'L' ? 'R' : 'L'}` : undefined
+    if (m && twin && twin in evidence) {
+      const stem = m[1] as string
+      rows.push({
+        key: STEMS[stem] ?? stem,
+        en: evidence[`${stem}L`],
+        ar: evidence[`${stem}R`],
+      })
+      used.add(`${stem}L`).add(`${stem}R`)
+      continue
+    }
+    rows.push({ key, one: evidence[key] })
+    used.add(key)
+  }
+  return rows
+}
+
+const show = (value: unknown, key?: string) =>
+  value === undefined
+    ? '–'
+    : key === 'side'
+      ? (SIDE_WORDS[String(value)] ?? String(value))
+      : typeof value === 'number' && !Number.isInteger(value)
+        ? String(Math.round(value * 100) / 100)
+        : String(value)
 const MATCH_WORDS: Record<string, string> = {
   testid: 'by test id',
   path: 'by DOM path',
@@ -205,7 +271,20 @@ function Detail({ finding }: { finding: Finding }) {
   const parts = finding.selector.split(/(?<=\s>\s)(?=[^>]*$)/)
   const parent = parts.length > 1 ? parts[0] : ''
   const own = parts.at(-1) ?? finding.selector
-  const measurements = Object.entries(finding.evidence).filter(([key]) => !SHOWN_ABOVE.has(key))
+  const measurements = measurementRows(finding.evidence)
+  const paired = measurements.some((r) => r.en !== undefined || r.ar !== undefined)
+  // Page-level SEO and performance findings lead with what's wrong, in a sentence, as in
+  // the design; there's no element to name.
+  const side = finding.evidence.side
+  const pageLevel = finding.area === 'seo' || finding.area === 'performance'
+  const sentence = finding.message.replace(/^(English|Arabic): /, '')
+  const split = sentence.match(/^(.+?[.!?])\s+(.*)$/s)
+  const first = split?.[1] ?? sentence
+  const after = split?.[2] ?? ''
+  // A written headline when there is one; otherwise the message's first sentence leads.
+  const written = pageLevel ? headline(finding) : undefined
+  const title = pageLevel ? (written ?? first) : undefined
+  const rest = pageLevel ? (written ? sentence : after) : ''
 
   return (
     <section className="detail" aria-labelledby="detail-title">
@@ -217,17 +296,30 @@ function Detail({ finding }: { finding: Finding }) {
           </span>
           <code className="muted">{finding.rule}</code>
           <StatusTag finding={finding} />
+          {title && typeof side === 'string' && SIDE_WORDS[side] ? (
+            <span className="tag">{SIDE_WORDS[side]}</span>
+          ) : null}
         </p>
-        <h2 id="detail-title">
-          <bdi dir="ltr">
-            <code>
-              {parent ? <span className="muted">{parent}</span> : null}
-              {own}
-            </code>
-          </bdi>
-        </h2>
-        <p className="detail-rule">{ruleTitle(finding.rule)}</p>
-        <p>{finding.message}</p>
+        {title ? (
+          <>
+            <h2 id="detail-title" className="detail-headline">
+              {title}
+            </h2>
+            {rest ? <p>{rest}</p> : null}
+          </>
+        ) : (
+          <>
+            <h2 id="detail-title">
+              <bdi dir="ltr">
+                <code>
+                  {parent ? <span className="muted">{parent}</span> : null}
+                  {own}
+                </code>
+              </bdi>
+            </h2>
+            <p>{finding.message}</p>
+          </>
+        )}
       </div>
 
       {fix ? (
@@ -303,28 +395,53 @@ function Detail({ finding }: { finding: Finding }) {
       {measurements.length ? (
         <div className="detail-section">
           <h3>Measurements</h3>
-          <table className="evidence">
-            <thead>
-              <tr>
-                <th scope="col">Key</th>
-                <th scope="col">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {measurements.map(([key, value]) => (
-                <tr key={key}>
-                  <th scope="row">{evidenceLabel(key)}</th>
-                  <td dir="ltr">
-                    <code>
-                      {key === 'side'
-                        ? (SIDE_WORDS[String(value)] ?? String(value))
-                        : String(value)}
-                    </code>
-                  </td>
+          {paired ? (
+            <table className="evidence">
+              <thead>
+                <tr>
+                  <th scope="col">Key</th>
+                  <th scope="col">English</th>
+                  <th scope="col">Arabic</th>
                 </tr>
+              </thead>
+              <tbody>
+                {measurements.map((r) => (
+                  <tr key={r.key}>
+                    <th scope="row">
+                      <code>{r.key}</code>
+                    </th>
+                    {r.en !== undefined || r.ar !== undefined ? (
+                      <>
+                        <td dir="ltr" className={r.off === 'en' ? 'off' : undefined}>
+                          <code>{show(r.en)}</code>
+                        </td>
+                        <td dir="ltr" className={r.off === 'ar' ? 'off' : undefined}>
+                          <code>{show(r.ar)}</code>
+                        </td>
+                      </>
+                    ) : (
+                      <td dir="ltr" colSpan={2}>
+                        <code>{show(r.one, r.key)}</code>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <dl className="measures">
+              {measurements.map((r) => (
+                <div key={r.key}>
+                  <dt>
+                    <code>{r.key}</code>
+                  </dt>
+                  <dd dir="ltr">
+                    <code>{show(r.one, r.key)}</code>
+                  </dd>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </dl>
+          )}
         </div>
       ) : null}
 
@@ -363,7 +480,10 @@ function Detail({ finding }: { finding: Finding }) {
   )
 }
 
-const TYPE_LABELS = Object.fromEntries(TYPES.map((t) => [t.id, t.label]))
+const TYPE_LABELS: Record<string, string> = {
+  ...Object.fromEntries(TYPES.map((t) => [t.id, t.label])),
+  document: 'Document',
+}
 
 function Requests({ perf, arabic }: { perf: PagePerf; arabic: boolean }) {
   const shown = perf.resources

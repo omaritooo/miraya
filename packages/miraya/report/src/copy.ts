@@ -235,3 +235,56 @@ export function elementLabel(finding: Finding): string {
   if (typeof text === 'string' && text.trim()) return text.trim()
   return finding.selector.split(/\s*>\s*/).at(-1) ?? finding.selector
 }
+
+/**
+ * What an SEO or performance finding says in one line, for the details' heading, as the
+ * design writes it: "Arabic page names the English one as canonical".
+ */
+const HEADLINES: Record<string, (lang: string, other: string) => string> = {
+  'canonical points-at-twin': (l, o) => `${l} page names the ${o} one as canonical`,
+  'canonical missing': (l) => `${l} page has no canonical link`,
+  'canonical several': (l) => `${l} page has more than one canonical link`,
+  'canonical other-origin': (l) => `${l} canonical points at another site`,
+  'canonical invalid': (l) => `${l} canonical isn't a valid URL`,
+  'page-title missing': (l) => `${l} page has no title`,
+  'page-title long': (l) => `${l} title is cut off in search results`,
+  'page-title short': (l) => `${l} title is very short`,
+  'page-title untranslated': (l) => `${l} title is still in English`,
+  'meta-description missing': (l) => `${l} page has no description`,
+  'meta-description long': (l) => `${l} description is cut off in search results`,
+  'meta-description short': (l) => `${l} description is very short`,
+  'meta-description untranslated': (l) => `${l} description is still in English`,
+  'robots-noindex noindex': (l) => `${l} page tells search engines not to index it`,
+  'hreflang missing': (l) => `${l} page has no language links`,
+  'hreflang wrong-twin': (l, o) => `${l} page links to the wrong ${o} page`,
+  'hreflang no-twin': (l, o) => `${l} page doesn't link to its ${o} twin`,
+  'hreflang twin-lang': (l, o) => `${l} page labels its ${o} twin with the wrong language`,
+  'hreflang no-self': (l) => `${l} page doesn't list itself in its language links`,
+  'hreflang lang-mismatch': (l) => `${l} page's own language link has the wrong code`,
+  'hreflang no-x-default': (l) => `${l} page has no x-default link`,
+  'single-h1 missing': (l) => `${l} page has no h1`,
+  'single-h1 several': (l) => `${l} page has more than one h1`,
+  'structured-data invalid': (l) => `${l} JSON-LD doesn't parse`,
+  'structured-data untyped': (l) => `${l} JSON-LD has no @type`,
+  'duplicate-title title': (l) => `${l} title is shared with other pages`,
+  'duplicate-title description': (l) => `${l} description is shared with other pages`,
+  'social-preview': (l) => `${l} link previews are missing tags`,
+  'lcp-budget over': (l) => `${l} largest paint is over budget`,
+  'cls-budget over': (l) => `${l} layout shifts more than the budget`,
+  'tbt-budget over': (l) => `${l} scripts block the page past the budget`,
+  'js-budget over': (l) => `${l} page loads more JavaScript than the budget`,
+  'render-blocking over': (l) => `${l} first paint waits for blocking files`,
+  'oversized-images oversized': (l) => `${l} images are larger than they're drawn`,
+}
+
+export function headline(finding: Finding): string | undefined {
+  const check = String(finding.evidence.check ?? '').replace(/ .*/, '')
+  const make =
+    HEADLINES[`${finding.rule} ${check}`] ??
+    (finding.rule === 'social-preview' ? HEADLINES['social-preview'] : undefined)
+  if (!make) return undefined
+  const side = finding.evidence.side
+  // "English and Arabic page has no title": one finding about both renders.
+  if (side === 'both') return make('English and Arabic', 'other')
+  return side === 'ltr' ? make('English', 'Arabic') : make('Arabic', 'English')
+}

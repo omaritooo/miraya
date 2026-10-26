@@ -660,19 +660,19 @@ input[type='search'] {
   margin-inline-start: auto;
 }
 .screens {
+  /* English above Arabic, each as wide as the stage, as in the design. */
   flex: 1 1 auto;
   min-block-size: 0;
-  display: grid;
-  grid-template-columns: repeat(var(--panes), minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   margin: 12px 24px 24px;
   padding: 24px;
   border-radius: 4px;
   background: var(--sunken);
 }
 .screens-note {
-  grid-column: 1 / -1;
   font-size: 12px;
   color: var(--muted);
 }
@@ -695,8 +695,8 @@ input[type='search'] {
   font-weight: 700;
 }
 .pane-scroll {
-  flex: 0 1 auto;
-  min-block-size: 0;
+  flex: none;
+  max-block-size: 560px;
   overflow: auto;
   border-radius: 2px;
   box-shadow: var(--card);
@@ -1368,17 +1368,15 @@ input[type='search'] {
   overflow-wrap: anywhere;
 }
 .lcp-shot {
-  max-block-size: 280px;
-  overflow: auto;
+  position: relative;
+  overflow: hidden;
   border-radius: 4px;
   background: var(--sunken);
 }
-.lcp-canvas {
-  position: relative;
-}
-.lcp-canvas img {
-  display: block;
-  inline-size: 100%;
+.lcp-shot img {
+  position: absolute;
+  max-inline-size: none;
+  inset-inline-start: auto;
 }
 .lcp-box {
   position: absolute;
@@ -1521,4 +1519,107 @@ input[type='search'] {
   .stage.site {
     grid-column: 1;
   }
+}
+
+.detail-headline {
+  font-size: 20px;
+  line-height: 28px;
+}
+.measures {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 24px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+.measures > div {
+  display: contents;
+}
+.measures dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.evidence td.off {
+  color: var(--error);
+  font-weight: 700;
+}
+
+/* Performance metric cards, as in the design */
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 12px;
+}
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--raised);
+}
+.metric-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+}
+.metric-head .metric-name {
+  font-weight: 700;
+}
+.metric-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.metric-cell .metric-lang {
+  inline-size: 20px;
+  min-inline-size: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.metric-cell .metric-value {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.metric-unit {
+  color: var(--muted);
+  font-size: 12px;
+}
+.metric-cards.dev .metric-value {
+  color: var(--muted);
+}
+.weight-script {
+  background: #0273ba;
+}
+.weight-style {
+  background: #6f2cac;
+}
+.weight-font {
+  background: #c28400;
+}
+.weight-image {
+  background: #22a09f;
+}
+.weight-other,
+.weight-document {
+  background: #73828c;
+}
+
+.screens > .pane {
+  flex: none;
+}
+.page-count {
+  white-space: nowrap;
+}
+
+.cell-note {
+  font-size: 12px;
+  line-height: 16px;
 }
